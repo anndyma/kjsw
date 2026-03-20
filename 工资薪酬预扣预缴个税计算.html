@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工资所得个税计算器 - 2026 个人所得税计算器</title>
+<meta name="keywords" content="工资个税计算器，个人所得税计算器，工资计算器" />
+<meta name="description" content="最新工资所得个人所得税计算器，采用最新个税起征点 5000 元，个税税率表，提供工资薪金所得个税累计预扣预缴计算方法。" />
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- Font -->
+<link href="https://cdn.fontsource.org/fonts/noto-sans-sc/400.css" rel="stylesheet">
+<link href="https://cdn.fontsource.org/fonts/noto-sans-sc/700.css" rel="stylesheet">
+<style>
+body {
+font-family: 'Noto Sans SC', sans-serif;
+background-color: #f5f7fa;
+color: #333;
+position: relative;
+}
+.input-group {
+position: relative;
+margin-bottom: 1.25rem;
+}
+.input-label {
+display: block;
+font-size: 0.95rem;
+color: #374151;
+margin-bottom: 0.5rem;
+font-weight: 600;
+}
+.input-wrapper {
+position: relative;
+display: flex;
+align-items: center;
+}
+.input-field {
+width: 100%;
+padding: 0.6rem 0.75rem;
+border: 1px solid #d1d5db;
+border-radius: 0.375rem;
+font-size: 0.95rem;
+transition: all 0.2s;
+}
+.input-field:focus {
+outline: none;
+border-color: #2563eb;
+box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+.input-suffix {
+position: absolute;
+right: -3.5rem;
+color: #6b7280;
+font-size: 0.875rem;
+pointer-events: none;
+white-space: nowrap;
+}
+.input-tip {
+margin-top: 0.25rem;
+font-size: 0.75rem;
+color: #6b7280;
+line-height: 1.4;
+background-color: #f9fafb;
+padding: 0.25rem 0.5rem;
+border-radius: 0.25rem;
+border-left: 2px solid #9ca3af;
+}
+.panel {
+background: white;
+border-radius: 0.5rem;
+box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+border: 1px solid #e5e7eb;
+overflow: hidden;
+position: relative;
+z-index: 1;
+}
+.panel-header {
+background-color: #f8fafc;
+padding: 1rem 1.5rem;
+border-bottom: 1px solid #e5e7eb;
+font-size: 1.125rem;
+font-weight: 700;
+color: #1e3a8a;
+}
+.btn-calc {
+background-color: #2563eb;
+color: white;
+font-weight: 600;
+padding: 0.75rem 2rem;
+border-radius: 0.375rem;
+border: none;
+cursor: pointer;
+transition: background-color 0.2s;
+font-size: 1rem;
+width: 100%;
+margin-bottom: 0.75rem;
+}
+.btn-calc:hover {
+background-color: #1d4ed8;
+}
+.btn-reset {
+background-color: #ffffff;
+color: #4b5563;
+font-weight: 600;
+padding: 0.75rem 2rem;
+border-radius: 0.375rem;
+border: 1px solid #d1d5db;
+cursor: pointer;
+transition: all 0.2s;
+font-size: 1rem;
+width: 100%;
+}
+.btn-reset:hover {
+background-color: #f3f4f6;
+border-color: #9ca3af;
+}
+.result-item {
+display: flex;
+justify-content: space-between;
+align-items: center;
+padding: 0.75rem 0;
+border-bottom: 1px dashed #e5e7eb;
+}
+.result-item:last-child {
+border-bottom: none;
+}
+.result-label {
+color: #4b5563;
+font-size: 0.95rem;
+}
+.result-value {
+font-weight: 700;
+color: #1e3a8a;
+font-size: 1.1rem;
+}
+.type-badge {
+display: inline-block;
+padding: 0.25rem 0.75rem;
+background-color: #dbeafe;
+color: #1e40af;
+border-radius: 9999px;
+font-size: 0.875rem;
+font-weight: 500;
+margin-top: 0.5rem;
+}
+.section-title {
+font-size: 1rem;
+font-weight: 600;
+color: #1e3a8a;
+border-left: 3px solid #2563eb;
+padding-left: 0.75rem;
+margin: 1.5rem 0 1rem 0;
+}
+.sub-section {
+background-color: #f8fafc;
+border: 1px solid #e2e8f0;
+border-radius: 0.375rem;
+padding: 1rem;
+margin-bottom: 1rem;
+}
+.sub-section-title {
+font-size: 0.9rem;
+font-weight: 600;
+color: #475569;
+margin-bottom: 0.75rem;
+display: flex;
+align-items: center;
+gap: 0.5rem;
+flex-wrap: wrap;
+}
+.sub-section-title::before {
+content: '';
+display: inline-block;
+width: 8px;
+height: 8px;
+background-color: #2563eb;
+border-radius: 50%;
+}
+.tax-note {
+background-color: #fef3c7;
+border-left: 4px solid #f59e0b;
+}
+.tax-note.blue {
+background-color: #dbeafe;
+border-left-color: #2563eb;
+}
+.grid-2 {
+display: grid;
+grid-template-columns: repeat(2, 1fr);
+gap: 1rem;
+}
+@media (max-width: 768px) {
+.grid-2 {
+grid-template-columns: 1fr;
+}
+.input-suffix {
+right: 0.75rem;
+}
+}
+.year-badge {
+display: inline-block;
+background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
+color: white;
+padding: 0.25rem 0.75rem;
+border-radius: 9999px;
+font-size: 0.75rem;
+font-weight: 600;
+margin-left: 0.5rem;
+}
+
+/* 水印样式 */
+.watermark-container {
+position: fixed;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+pointer-events: none;
+z-index: 0;
+overflow: hidden;
+}
+
+.watermark {
+position: absolute;
+font-size: 14px;
+color: rgba(0, 0, 0, 0.08);
+white-space: nowrap;
+transform: rotate(-30deg);
+transform-origin: center;
+user-select: none;
+font-weight: 500;
+}
+</style>
+</head>
+<body class="min-h-screen flex flex-col">
+<!-- 水印容器 -->
+<div class="watermark-container" id="watermarkContainer"></div>
+
+<!-- Header -->
+<header class="bg-white border-b border-gray-200 shadow-sm relative z-10">
+<div class="container mx-auto px-4 py-4 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-blue-900 rounded flex items-center justify-center text-white font-bold text-xl">税</div>
+<div>
+<h1 class="text-xl font-bold text-gray-800">工资所得个税计算器</h1>
+<p class="text-xs text-gray-500">Salary Income Tax Calculator</p>
+</div>
+</div>
+</div>
+</header>
+
+<!-- Main Content -->
+<main class="flex-grow container mx-auto px-4 py-8 relative z-10">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+<!-- Left Column: Input Form -->
+<div class="lg:col-span-7">
+<div class="panel">
+<div class="panel-header">
+<h3>工资薪金所得</h3>
+</div>
+<div class="p-6">
+<div class="input-group">
+<label class="input-label">收入类型</label>
+<div class="type-badge">工资薪金所得</div>
+</div>
+
+<div class="section-title">收入信息</div>
+
+<!-- 工资薪金 (月度预扣预缴模式) -->
+<div class="sub-section">
+<div class="sub-section-title">
+工资薪金所得
+<span class="year-badge">月度</span>
+</div>
+<div class="grid-2">
+<div class="input-group">
+<label class="input-label" for="E6">累计税前工资</label>
+<div class="input-wrapper">
+<input id="E6" type="number" class="input-field" placeholder="0.00" min="0" oninput="validateInput(this)">
+</div>
+<span class="input-suffix">元</span>
+<div class="input-tip">1 月至计算期的税前工资之和</div>
+</div>
+
+<div class="input-group">
+<label class="input-label" for="E9">累计免税收入</label>
+<div class="input-wrapper">
+<input id="E9" type="number" class="input-field" placeholder="0.00" value="0" min="0" oninput="validateInput(this)">
+</div>
+<span class="input-suffix">元</span>
+<div class="input-tip">临时生活补助、生育津贴等</div>
+</div>
+</div>
+</div>
+
+<div class="grid-2">
+<div class="input-group">
+<label class="input-label" for="E11">累计减除费用</label>
+<div class="input-wrapper">
+<input id="E11" type="number" class="input-field" placeholder="0.00" min="0" oninput="validateInput(this)">
+</div>
+<span class="input-suffix">元</span>
+<div class="input-tip">月份数 × 5000 元</div>
+</div>
+
+<div class="input-group">
+<label class="input-label" for="E13">累计三险一金</label>
+<div class="input-wrapper">
+<input id="E13" type="number" class="input-field" placeholder="0.00" value="0" min="0" oninput="validateInput(this)">
+</div>
+<span class="input-suffix">元</span>
+<div class="input-tip">累计养老、医疗、失业、住房公积金</div>
+</div>
+</div>
+
+<div class="section-title">专项附加扣除（全年累计）</div>
+
+<div class="grid-2">
+<div class="input-group">
+<label class="input-label" for="E14">子女教育</label>
+<div class="input-wrapper">
+<input id="E14" type="number" class="input-field" placeholder="0.00" value="0" min="0" oninput="validateInput(this)">
+</div>
+<span class="input-suffix">元</span>
+<div class="input-tip">2000 元/月/子女 × 月份数</div>
+</div>
+
+<div class="input-group">
+<label class="input-label" for="E15">继续教育</label>
+<div class="input-wrapper">
+<input id="E15" type="number" class="input-field" placeholder="0.00" value="0" min="0" oninput="validateInput(this)">
+</div>
+<span class="input-suffix">元</span>
+<div class="input-tip">400 元/月或 3600 元/年</div>
+</div>
+
+<div class="input-group">
+<label class="input-label" for="E16">住房贷款利息</label>
+<div class="input-wrapper">
+<input id="E16" type="number" class="input-field" placeholder="0.00" value="0" min="0" oninput="validateInput(this)">
+</div>
+<span class="input-suffix">元</span>
+<div class="input-tip">1000 元/月或 500 元/月</div>
+</div>
+
+<div class="input-group">
+<label class="input-label" for="E17">住房租金</label>
+<div class="input-wrapper">
+<input id="E17" type="number" class="input-field" placeholder="0.00" value="0" min="0" oninput="validateInput(this)">
+</div>
+<span class="input-suffix">元</span>
+<div class="input-tip">1500/1100/800 元/月</div>
+</div>
+
+<div class="input-group">
+<label class="input-label" for="E18">赡养老人</label>
+<div class="input-wrapper">
+<input id="E18" type="number" class="input-field" placeholder="0.00" value="0" min="0" oninput="validateInput(this)">
+</div>
+<span class="input-suffix">元</span>
+<div class="input-tip">3000 元/月（独生）或分摊</div>
+</div>
+
+<div class="input-group">
+<label class="input-label" for="E19">婴幼儿照护</label>
+<div class="input-wrapper">
+<input id="E19" type="number" class="input-field" placeholder="0.00" value="0" min="0" oninput="validateInput(this)">
+</div>
+<span class="input-suffix">元</span>
+<div class="input-tip">2000 元/月/婴幼儿</div>
+</div>
+</div>
+
+<div class="grid-2">
+<div class="input-group">
+<label class="input-label" for="E21">其他扣除</label>
+<div class="input-wrapper">
+<input id="E21" type="number" class="input-field" placeholder="0.00" value="0" min="0" oninput="validateInput(this)">
+</div>
+<span class="input-suffix">元</span>
+<div class="input-tip">商业健康险、年金等</div>
+</div>
+
+<div class="input-group">
+<label class="input-label" for="E22">公益慈善事业捐赠</label>
+<div class="input-wrapper">
+<input id="E22" type="number" class="input-field" placeholder="0.00" value="0" min="0" oninput="validateInput(this)">
+</div>
+<span class="input-suffix">元</span>
+<div class="input-tip">符合条件的公益慈善事业捐赠支出</div>
+</div>
+</div>
+
+<div class="input-group">
+<label class="input-label" for="E24">累计已缴税额</label>
+<div class="input-wrapper">
+<input id="E24" type="number" class="input-field" placeholder="0.00" value="0" min="0" oninput="validateInput(this)">
+</div>
+<span class="input-suffix">元</span>
+<div class="input-tip">已预扣预缴的税款</div>
+</div>
+
+<div class="tax-note blue p-3 rounded text-sm text-blue-800 mt-4">
+<p class="font-bold mb-1">综合所得税率表（年度）：</p>
+<table class="w-full text-xs mt-2">
+<tr class="border-b"><td class="py-1">级数</td><td>全年应纳税所得额</td><td>税率</td><td>速算扣除数</td></tr>
+<tr class="border-b"><td class="py-1">1</td><td>不超过 36,000 元</td><td>3%</td><td>0</td></tr>
+<tr class="border-b"><td class="py-1">2</td><td>超过 36,000 元至 144,000 元</td><td>10%</td><td>2,520</td></tr>
+<tr class="border-b"><td class="py-1">3</td><td>超过 144,000 元至 300,000 元</td><td>20%</td><td>16,920</td></tr>
+<tr class="border-b"><td class="py-1">4</td><td>超过 300,000 元至 420,000 元</td><td>25%</td><td>31,920</td></tr>
+<tr class="border-b"><td class="py-1">5</td><td>超过 420,000 元至 660,000 元</td><td>30%</td><td>52,920</td></tr>
+<tr class="border-b"><td class="py-1">6</td><td>超过 660,000 元至 960,000 元</td><td>35%</td><td>85,920</td></tr>
+<tr><td class="py-1">7</td><td>超过 960,000 元</td><td>45%</td><td>181,920</td></tr>
+</table>
+</div>
+
+<div class="flex gap-4 mt-8">
+<button class="btn-calc" onclick="calculateTax()">计算</button>
+<button class="btn-reset" onclick="resetForm()">重置</button>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Right Column: Results -->
+<div class="lg:col-span-5">
+<div class="panel sticky top-6">
+<div class="panel-header bg-blue-50 border-blue-100">
+<h3>工资薪金所得计算结果</h3>
+</div>
+<div class="p-6">
+<div class="result-item">
+<span class="result-label">累计应纳税所得额</span>
+<span class="result-value"><span id="ljynssde">0.00</span> <span class="text-sm font-normal text-gray-500">元</span></span>
+</div>
+<div class="result-item">
+<span class="result-label">适用税率</span>
+<span class="result-value"><span id="lblTaxRate">0</span><span class="text-sm font-normal text-gray-500">%</span></span>
+</div>
+<div class="result-item">
+<span class="result-label">速算扣除数</span>
+<span class="result-value"><span id="lblQuick">0.00</span> <span class="text-sm font-normal text-gray-500">元</span></span>
+</div>
+<div class="result-item">
+<span class="result-label">累计应缴税款</span>
+<span class="result-value"><span id="txtTaxAll">0.00</span> <span class="text-sm font-normal text-gray-500">元</span></span>
+</div>
+<div class="result-item">
+<span class="result-label">累计已缴税额</span>
+<span class="result-value"><span id="txtTaxAlready">0.00</span> <span class="text-sm font-normal text-gray-500">元</span></span>
+</div>
+<div class="result-item bg-red-50 p-3 rounded -mx-3 mt-2 border border-red-100">
+<span class="result-label text-red-800 font-bold">本期应补税额</span>
+<span class="result-value text-red-600"><span id="rst_ykse">0.00</span> <span class="text-sm font-normal text-gray-500">元</span></span>
+</div>
+
+<div class="mt-6 p-4 bg-gray-50 rounded text-sm text-gray-600 leading-relaxed">
+<p class="font-bold mb-2">计算公式：</p>
+<p>应纳税额 = 累计应纳税所得额 × 税率 - 速算扣除数 - 累计已缴税额</p>
+<p class="mt-2">累计应纳税所得额 = 累计收入 - 累计免税收入 - 累计减除费用 - 累计专项扣除 - 累计专项附加扣除 - 累计其他扣除 - 公益慈善捐赠</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+
+<footer class="bg-gray-800 text-gray-400 py-6 mt-12 relative z-10">
+<div class="container mx-auto px-4 text-center text-sm">
+<p>&copy; 2026 工资所得个税计算器。本结果仅供学习交流，具体以税务实际征收为准。联系加微信群 13919499872</p>
+</div>
+</footer>
+
+<script>
+// 创建水印
+function createWatermark() {
+const container = document.getElementById('watermarkContainer');
+const watermarkText = '2026 工资所得个税计算器。本结果仅供学习交流，具体以税务实际征收为准。联系加微信群 13919499872';
+
+// 计算需要多少个水印才能覆盖整个页面
+const screenWidth = window.innerWidth;
+const screenHeight = window.innerHeight;
+const watermarkWidth = 400;
+const watermarkHeight = 100;
+const gap = 150;
+
+// 创建多个水印元素，形成网格状覆盖
+for (let y = -watermarkHeight; y < screenHeight + watermarkHeight; y += gap) {
+for (let x = -watermarkWidth; x < screenWidth + watermarkWidth; x += gap) {
+const watermark = document.createElement('div');
+watermark.className = 'watermark';
+watermark.innerText = watermarkText;
+watermark.style.left = x + 'px';
+watermark.style.top = y + 'px';
+container.appendChild(watermark);
+}
+}
+}
+
+// Validate input - prevent negative numbers
+function validateInput(input) {
+let value = parseFloat(input.value);
+if (isNaN(value) || value < 0) {
+input.value = '0';
+}
+}
+
+// Clear Results
+function clearResults() {
+document.getElementById('ljynssde').innerText = '0.00';
+document.getElementById('lblTaxRate').innerText = '0';
+document.getElementById('lblQuick').innerText = '0.00';
+document.getElementById('txtTaxAll').innerText = '0.00';
+document.getElementById('txtTaxAlready').innerText = '0.00';
+document.getElementById('rst_ykse').innerText = '0.00';
+}
+
+// Reset Form
+function resetForm() {
+document.querySelectorAll('input[type="number"]').forEach(input => {
+input.value = '';
+});
+
+// Set default values for fields that should have 0
+const zeroFields = ['E9', 'E13', 'E14', 'E15', 'E16', 'E17', 'E18', 'E19', 'E21', 'E22', 'E24'];
+
+zeroFields.forEach(id => {
+const el = document.getElementById(id);
+if (el) {
+el.value = '0';
+}
+});
+
+clearResults();
+}
+
+// Get value helper
+function getVal(id) {
+const el = document.getElementById(id);
+return el ? (parseFloat(el.value) || 0) : 0;
+}
+
+// Calculate tax with cumulative brackets (for comprehensive income)
+function calculateTaxWithBrackets(taxableIncome) {
+let taxRate = 0;
+let quickDeduction = 0;
+
+if (taxableIncome <= 36000) {
+taxRate = 0.03;
+quickDeduction = 0;
+} else if (taxableIncome <= 144000) {
+taxRate = 0.10;
+quickDeduction = 2520;
+} else if (taxableIncome <= 300000) {
+taxRate = 0.20;
+quickDeduction = 16920;
+} else if (taxableIncome <= 420000) {
+taxRate = 0.25;
+quickDeduction = 31920;
+} else if (taxableIncome <= 660000) {
+taxRate = 0.30;
+quickDeduction = 52920;
+} else if (taxableIncome <= 960000) {
+taxRate = 0.35;
+quickDeduction = 85920;
+} else {
+taxRate = 0.45;
+quickDeduction = 181920;
+}
+
+let tax = taxableIncome * taxRate - quickDeduction;
+if (tax < 0) tax = 0;
+
+return { taxRate, quickDeduction, tax };
+}
+
+// Calculate Tax Logic
+function calculateTax() {
+// 工资薪金所得（预扣预缴）
+const income = getVal('E6');
+const exemptIncome = getVal('E9');
+const deductionExpense = getVal('E11');
+const socialSecurity = getVal('E13');
+const totalSpecialDeduct = getVal('E14') + getVal('E15') + getVal('E16') + getVal('E17') + getVal('E18') + getVal('E19');
+const otherDeduct = getVal('E21');
+const donation = getVal('E22');
+const alreadyPaidTax = getVal('E24');
+
+// 应纳税所得额 = 收入 - 免税 - 减除费用 - 三险一金 - 专项附加扣除 - 其他扣除 - 捐赠
+let taxableIncome = income - exemptIncome - deductionExpense - socialSecurity - totalSpecialDeduct - otherDeduct - donation;
+if (taxableIncome < 0) taxableIncome = 0;
+
+// 使用综合所得税率表
+const result = calculateTaxWithBrackets(taxableIncome);
+const taxRate = result.taxRate;
+const quickDeduction = result.quickDeduction;
+const tax = result.tax;
+
+let currentTax = tax - alreadyPaidTax;
+if (currentTax < 0) currentTax = 0;
+
+// Update Results UI
+document.getElementById('ljynssde').innerText = taxableIncome.toFixed(2);
+document.getElementById('lblTaxRate').innerText = (taxRate * 100).toFixed(0);
+document.getElementById('lblQuick').innerText = quickDeduction.toFixed(2);
+document.getElementById('txtTaxAll').innerText = tax.toFixed(2);
+document.getElementById('txtTaxAlready').innerText = alreadyPaidTax.toFixed(2);
+document.getElementById('rst_ykse').innerText = currentTax.toFixed(2);
+}
+
+// Initialize
+window.onload = function() {
+createWatermark();
+};
+
+// 窗口大小改变时重新创建水印
+window.onresize = function() {
+const container = document.getElementById('watermarkContainer');
+container.innerHTML = '';
+createWatermark();
+};
+</script>
+</body>
+</html>
+
