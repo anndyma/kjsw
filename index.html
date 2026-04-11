@@ -1,306 +1,779 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🧰 高效工具箱</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
-        :root {
-            --primary: #6366f1;
-            --primary-dark: #4f46e5;
-            --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --card-bg: #ffffff;
-            --text-main: #1f2937;
-            --text-sub: #6b7280;
-            --shadow: 0 10px 40px rgba(0,0,0,0.15);
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enterprise Finance OS MAX (Modular)</title>
+<style>
+/* 全局核心样式 */
+:root {--primary:#2563eb;--primary-hover:#1d4ed8;--primary-light:#eff6ff;--success:#16a34a;--success-hover:#15803d;--success-light:#f0fdf4;--warning:#f59e0b;--warning-hover:#d97706;--warning-light:#fffbeb;--danger:#dc2626;--danger-hover:#b91c1c;--danger-light:#fef2f2;--info:#0ea5e9;--info-hover:#0284c7;--dark:#0f172a;--dark-hover:#1e293b;--bg-body:#f8fafc;--bg-surface:#ffffff;--border:#e2e8f0;--text-main:#1e293b;--text-muted:#64748b;--shadow-sm:0 1px 2px 0 rgba(0,0,0,0.05);--shadow-md:0 4px 6px -1px rgba(0,0,0,0.1);--shadow-lg:0 10px 15px -3px rgba(0,0,0,0.1);--radius:8px;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg-body);color:var(--text-main);font-size:13px;line-height:1.5;overflow:hidden;}
+::-webkit-scrollbar{width:6px;height:6px;} ::-webkit-scrollbar-track{background:transparent;} ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px;} ::-webkit-scrollbar-thumb:hover{background:#94a3b8;}
+.hidden{display:none!important;}
+@media (max-width:600px){.hidden-mobile{display:none!important;}}
+.layout{display:flex;height:100vh;overflow:hidden;}
 
-        body {
-            font-family: 'Noto Sans SC', sans-serif;
-            background: var(--bg-gradient);
-            min-height: 100vh;
-            color: var(--text-main);
-        }
+/* 沉浸侧边栏与布局 */
+.sidebar{width:220px;background:var(--dark);display:flex;flex-direction:column;flex-shrink:0;box-shadow:2px 0 8px rgba(0,0,0,0.1);z-index:10;transition:width 0.3s cubic-bezier(0.4, 0, 0.2, 1);overflow:hidden;}
+.sidebar.collapsed{width:0;}
 
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 3rem 1.5rem;
-        }
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative;transition:all 0.3s;}
+.topbar{height:56px;background:var(--bg-surface);display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:1px solid var(--border);z-index:5;}
+.page{flex:1;overflow-y:auto;padding:20px;scroll-behavior:smooth;}
+.flex-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;} .flex-between{display:flex;align-items:center;justify-content:space-between;}
+.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;} .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+.f1{flex:1;} .w-full{width:100%;} .mb-2{margin-bottom:8px;} .mb-3{margin-bottom:12px;} .mb-4{margin-bottom:16px;} .mt-3{margin-top:12px;}
+.tc{text-align:center;} .tr{text-align:right;} .tl{text-align:left;} .bold{font-weight:600;} .mono{font-family:'JetBrains Mono',Consolas,monospace;font-weight:500;}
+.text-sm{font-size:12px;} .text-xs{font-size:11px;} .color-p{color:var(--primary);} .color-d{color:var(--danger);} .color-s{color:var(--success);} .color-m{color:var(--text-muted);} .color-i{color:var(--info);}
+.cursor-pointer{cursor:pointer;}
+.card{background:var(--bg-surface);border-radius:var(--radius);padding:20px;border:1px solid var(--border);box-shadow:var(--shadow-sm);margin-bottom:16px;}
+.scard{background:var(--bg-surface);border-radius:var(--radius);padding:16px;border:1px solid var(--border);transition:transform 0.2s,box-shadow 0.2s;} .scard:hover{box-shadow:var(--shadow-md);transform:translateY(-2px);}
+.ctitle{font-size:16px;font-weight:600;color:var(--text-main);margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border);display:flex;align-items:center;}
 
-        .header {
-            text-align: center;
-            color: white;
-            margin-bottom: 3rem;
-        }
+/* 交互组件 */
+.btn{padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:500;display:inline-flex;align-items:center;justify-content:center;transition:all .2s;outline:none;user-select:none;} .btn:active{transform:scale(0.97);} .btn:disabled{opacity:0.6;cursor:not-allowed;transform:none;}
+.btn-p{background:var(--primary);color:#fff;box-shadow:0 2px 4px rgba(37,99,235,0.2);} .btn-p:hover:not(:disabled){background:var(--primary-hover);}
+.btn-s{background:var(--success);color:#fff;box-shadow:0 2px 4px rgba(22,163,74,0.2);} .btn-s:hover:not(:disabled){background:var(--success-hover);}
+.btn-d{background:var(--danger);color:#fff;} .btn-d:hover:not(:disabled){background:var(--danger-hover);} .btn-w{background:var(--warning);color:#fff;} .btn-w:hover:not(:disabled){background:var(--warning-hover);}
+.btn-i{background:var(--info);color:#fff;} .btn-i:hover:not(:disabled){background:var(--info-hover);} .btn-n{background:#fff;color:var(--text-main);border:1px solid #cbd5e1;} .btn-n:hover:not(:disabled){background:#f1f5f9;border-color:#94a3b8;}
+.btn-text{background:transparent;color:var(--text-muted);padding:4px 8px;border-radius:4px;} .btn-text:hover{background:var(--border);color:var(--text-main);} .btn-text.danger{color:var(--danger);} .btn-text.danger:hover{background:var(--danger-light);}
+.inp,.sel{padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;font-size:13px;color:var(--text-main);transition:all .2s;width:100%;box-shadow:inset 0 1px 2px rgba(0,0,0,0.02);}
+.inp:focus,.sel:focus{border-color:var(--primary);outline:none;box-shadow:0 0 0 3px rgba(37,99,235,0.15);} .inp:disabled,.sel:disabled{background:#f1f5f9;color:var(--text-muted);cursor:not-allowed;}
+label{display:block;font-weight:500;color:var(--text-muted);margin-bottom:6px;font-size:12px;}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;white-space:nowrap;} .badge.blue{background:#dbeafe;color:#1e40af;} .badge.green{background:#dcfce7;color:#166534;} .badge.orange{background:#fef3c7;color:#b45309;} .badge.purple{background:#f3e8ff;color:#7e22ce;} .badge.gray{background:#f1f5f9;color:#475569;} .badge.red{background:#fee2e2;color:#991b1b;} .badge.cyan{background:#e0f2fe;color:#0369a1;}
+.alert{padding:12px 16px;border-radius:var(--radius);font-size:13px;margin-bottom:16px;display:flex;align-items:flex-start;gap:8px;line-height:1.5;} .alert-info{background:var(--primary-light);border:1px solid #bfdbfe;color:#1e3a8a;} .alert-warn{background:var(--warning-light);border:1px solid #fde68a;color:#92400e;}
 
-        .header-icon {
-            font-size: 3.5rem;
-            margin-bottom: 1rem;
-            animation: float 3s ease-in-out infinite;
-        }
+/* 表格线 */
+.table-wrap{overflow:auto;max-height:65vh;border:1px solid #cbd5e1;border-radius:var(--radius);box-shadow:var(--shadow-sm);}
+.tbl{width:100%;border-collapse:collapse;min-width:600px;} 
+.tbl th,.tbl td{padding:10px 12px;border:1px solid #cbd5e1;color:var(--text-main);} 
+.tbl th{background:#f8fafc;font-weight:600;color:var(--text-muted);text-transform:uppercase;font-size:12px;position:sticky;top:0;z-index:2;} 
+.tbl tbody tr{transition:background .15s;} .tbl tbody tr:hover{background:var(--primary-light);} .tbl tbody tr.highlight{background:#fffbeb;font-weight:600;}
+.dr-val{color:var(--danger);font-family:Consolas,monospace;} .cr-val{color:var(--success);font-family:Consolas,monospace;}
 
-        @keyframes float {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-8px); }
-        }
+.rep-tbl{border:2px solid #64748b;border-collapse:collapse;width:100%;min-width:800px;background:#fff;} 
+.rep-tbl th{background:#f1f5f9;border:1px solid #94a3b8;border-bottom:2px solid #64748b;color:var(--text-main);font-weight:bold;text-align:center;font-size:13px;padding:12px;} 
+.rep-tbl td{border:1px solid #cbd5e1;font-size:13px;padding:8px 12px;} .rep-tbl tbody tr:hover{background:rgba(37,99,235,.04);}
 
-        .header h1 {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
+/* 导航、下拉及遮罩 */
+.logo{height:56px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:800;background:#0b1120;letter-spacing:2px;border-bottom:1px solid #1e293b;white-space:nowrap;} .book-bar{padding:12px 16px;background:rgba(255,255,255,.03);border-bottom:1px solid #1e293b;min-width:220px;} .menu-area{flex:1;overflow-y:auto;padding:12px 8px;min-width:220px;} .menu-group{font-size:11px;color:#64748b;padding:12px 12px 4px;text-transform:uppercase;letter-spacing:1px;font-weight:600;} .menu-item{padding:9px 12px;margin-bottom:2px;border-radius:6px;cursor:pointer;color:#94a3b8;transition:all .2s;display:flex;align-items:center;gap:8px;} .menu-item:hover{color:#f8fafc;background:rgba(255,255,255,.08);} .menu-item.active{color:#fff;background:var(--primary);box-shadow:0 2px 4px rgba(37,99,235,.3);font-weight:500;}
+.overlay{position:fixed;inset:0;background:rgba(15,23,42,.6);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:center;justify-content:center;animation:fadeIn .2s ease;} .dlg{background:var(--bg-surface);border-radius:12px;padding:24px;width:500px;max-height:85vh;overflow-y:auto;box-shadow:var(--shadow-lg);animation:slideUp .3s ease;} .dlg-lg{width:800px;} .dlg-xl{width:1050px;}
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}} @keyframes slideUp{from{opacity:0;transform:translateY(20px) scale(.98);}to{opacity:1;transform:translateY(0) scale(1);}}
+.accdrop{position:absolute;top:calc(100% + 4px);left:0;width:max-content;min-width:100%;max-height:220px;overflow-y:auto;background:#fff;border:1px solid var(--border);box-shadow:var(--shadow-md);z-index:8000;border-radius:6px;} .accitem{padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;} .accitem:hover,.accitem.active{background:var(--primary-light);}
+.boot{height:100vh;background:radial-gradient(circle at top right,#1e293b,#0f172a);display:flex;align-items:center;justify-content:center;} .bootbox{background:#fff;width:860px;border-radius:16px;box-shadow:0 25px 50px -12px rgba(0,0,0,.5);overflow:hidden;display:flex;flex-direction:column;} .bitem{padding:12px 16px;border:1px solid var(--border);border-radius:8px;margin-bottom:10px;cursor:pointer;background:#fff;transition:all .2s;display:flex;justify-content:space-between;align-items:center;} .bitem:hover{border-color:var(--primary);box-shadow:0 4px 6px -1px rgba(37,99,235,.1);transform:translateX(4px);}
+.v-input-cell{padding:0!important;position:relative;} .v-inp{width:100%;height:100%;border:none;outline:none;padding:8px 10px;background:transparent;font-size:13px;} .v-inp:focus{background:#fffbeb;box-shadow:inset 0 0 0 2px var(--warning);}
 
-        .header p {
-            opacity: 0.9;
-            font-size: 1rem;
-        }
-
-        .search-box {
-            display: flex;
-            background: white;
-            border-radius: 50px;
-            padding: 0.5rem;
-            box-shadow: var(--shadow);
-            max-width: 500px;
-            margin: 0 auto 2rem;
-        }
-
-        .search-input {
-            flex: 1;
-            border: none;
-            padding: 0.8rem 1.5rem;
-            font-size: 1rem;
-            outline: none;
-            border-radius: 50px;
-        }
-
-        .search-btn {
-            background: var(--primary);
-            color: white;
-            border: none;
-            padding: 0.8rem 1.5rem;
-            border-radius: 50px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: background 0.3s;
-        }
-
-        .search-btn:hover { background: var(--primary-dark); }
-
-        .tools-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 1.25rem;
-        }
-
-        .tool-card {
-            background: var(--card-bg);
-            border-radius: 16px;
-            padding: 1.5rem;
-            box-shadow: var(--shadow);
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: 2px solid transparent;
-        }
-
-        .tool-card:hover {
-            transform: translateY(-5px);
-            border-color: var(--primary);
-            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-        }
-
-        .tool-card.disabled {
-            opacity: 0.7;
-            cursor: not-allowed;
-        }
-
-        .tool-card.disabled:hover {
-            transform: none;
-            border-color: transparent;
-        }
-
-        .tool-icon {
-            width: 48px;
-            height: 48px;
-            background: var(--bg-gradient);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            margin-bottom: 1rem;
-        }
-
-        .tool-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            color: var(--text-main);
-        }
-
-        .tool-desc {
-            font-size: 0.85rem;
-            color: var(--text-sub);
-            line-height: 1.5;
-        }
-
-        .tool-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            color: var(--primary);
-            font-weight: 600;
-            font-size: 0.9rem;
-            margin-top: 1rem;
-            text-decoration: none;
-        }
-
-        .tool-card.disabled .tool-link {
-            color: var(--text-sub);
-        }
-
-        .arrow { transition: transform 0.3s; }
-        .tool-link:hover .arrow { transform: translateX(4px); }
-
-        .footer {
-            text-align: center;
-            color: white;
-            padding: 3rem 0 2rem;
-            margin-top: 3rem;
-        }
-
-        .footer-box {
-            background: rgba(255,255,255,0.1);
-            backdrop-filter: blur(10px);
-            padding: 1.5rem;
-            border-radius: 12px;
-            margin-bottom: 1.5rem;
-        }
-
-        .footer-box p {
-            font-size: 0.85rem;
-            opacity: 0.9;
-            margin-bottom: 0.5rem;
-        }
-
-        .empty-state {
-            text-align: center;
-            color: white;
-            padding: 3rem;
-            display: none;
-        }
-
-        .empty-state.active { display: block; }
-        .empty-icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.6; }
-
-        @media (max-width: 600px) {
-            .header h1 { font-size: 1.5rem; }
-            .tools-grid { grid-template-columns: 1fr; }
-            .search-box { flex-direction: column; border-radius: 16px; }
-            .search-input { border-radius: 12px; margin-bottom: 0.5rem; }
-            .search-btn { width: 100%; border-radius: 12px; }
-        }
-    </style>
+/* 原版级别无损全黑打印视图 */
+@media print{
+    body *{visibility:hidden} 
+    #printArea,#printArea *{visibility:visible} 
+    #printArea{position:absolute;left:0;top:0;width:100%;background:#fff;padding:20px;color:#000;} 
+    .btn,.no-print{display:none!important} 
+    .rep-tbl,.tbl,.ptbl{border-collapse:collapse!important;min-width:100%!important;} 
+    .rep-tbl{border:2px solid #000!important;} 
+    .rep-tbl th,.rep-tbl td,.tbl th,.tbl td,.ptbl th,.ptbl td{border:1px solid #000!important;color:#000!important;padding:4px 6px!important;} 
+    .rep-tbl thead th,.tbl thead th,.ptbl thead th{background:transparent!important;border-bottom:2px solid #000!important;} 
+    @page{margin:10mm}
+}
+#printArea{display:none} body.printing #printArea{display:block} .ptbl{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:13px;color:#000;} .ptbl th,.ptbl td{border:1px solid #000;padding:8px;} .ptbl th{text-align:center;font-weight:bold;background:#f8fafc;}
+</style>
 </head>
 <body>
-    <div class="container">
-        <header class="header">
-            <div class="header-icon">🧰</div>
-            <h1>一键计算工具箱</h1>
-            <p>一站式在线工具集合，便捷高效的计算辅助，结果仅用于学习交流，具体按相关规定为准</p>
-        </header>
 
-        <div class="search-box">
-            <input type="text" class="search-input" id="searchInput" placeholder="搜索工具..." autocomplete="off">
-            <button class="search-btn" onclick="searchTools()">搜索</button>
+<div id="envWarning" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.95); z-index:999999; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#1e293b; padding:35px; border-radius:12px; max-width:650px; color:#f8fafc; border:1px solid #ef4444; box-shadow:0 25px 50px -12px rgba(0,0,0,0.5); text-align: left;">
+        <h2 style="color:#f87171; margin-bottom:16px; font-size:22px;">⚠️ 无法在本地直接双击运行</h2>
+        <p style="font-size:15px; line-height:1.6; margin-bottom:25px; color:#cbd5e1;">检测到您正在直接双击打开 HTML 文件（浏览器地址栏为 <code style="color:#fbbf24; background:#000; padding:2px 6px; border-radius:4px;">file:///</code>）。<br><br>因为本系统采用了前沿的<b>模块化加载架构</b>，现代浏览器处于最高安全保护级别，<b>严禁跨文件读取和写入本地数据库</b>，这会导致建账和模块加载功能受限或断电卡死！</p>
+        <h3 style="color:#38bdf8; margin-bottom:12px; font-size:16px;">🚀 极速部署方案（2选1即可）：</h3>
+        <ul style="line-height:1.8; color:#e2e8f0; font-size:14px; padding-left:20px; margin-bottom:20px;">
+            <li><b>一键生成云端网页（推荐）</b>：将装有所有文件的<b>整个文件夹</b>，用鼠标拖拽到 <a href="https://app.netlify.com/drop" target="_blank" style="color:#60a5fa; font-weight:bold; text-decoration:underline;">Netlify Drop 官方网站</a> 的圆圈中，5 秒内即可免费生成手机电脑皆可访问的公网链接！</li>
+            <li style="margin-top:10px;"><b>本地开发运行</b>：使用 <b>VS Code</b> 编辑器打开本文件夹，安装 <b>Live Server</b> 插件，右键 index.html 启动运行。</li>
+        </ul>
+        <div style="text-align:right; border-top:1px solid #334155; padding-top:20px;">
+            <button onclick="document.getElementById('envWarning').style.display='none'" style="background:transparent; border:1px solid #64748b; color:#94a3b8; padding:8px 16px; border-radius:6px; cursor:pointer; font-size:13px;">我知道了，忽略警告强行进入</button>
         </div>
-
-        <div class="tools-grid" id="toolsGrid"></div>
-        <div class="empty-state" id="emptyState">
-            <div class="empty-icon">🔍</div>
-            <h3>未找到相关工具</h3>
-        </div>
-
-        <footer class="footer">
-            <div class="footer-box">
-                <p>⚠️ 计算结果仅供学习交流，具体以相关规定为准</p>
-                <p>📱 微信：13919499872 欢迎交流</p>
-            </div>
-            <p>© 2026 工具箱，助力您工作高效高能</p>
-        </footer>
     </div>
+</div>
+<script>if(window.location.protocol==='file:'){document.getElementById('envWarning').style.display='flex';}</script>
 
-    <script>
-        const tools = [
-            { title: '工资薪酬个税计算', desc: '计算工资薪酬的个人所得税', link: 'sqgz.html', icon: '💰', status: 'ok' },
-            { title: '年终奖个税计算', desc: '计算年终奖的个人所得税', link: 'nzj.html', icon: '🎁', status: 'ok' },
-            { title: '一般劳务报酬税前计算', desc: '一般劳务报酬税前计算个税', link: 'sqlwbc.html', icon: '📝', status: 'ok' },
-            { title: '工资税后算税前', desc: '已知税后工资反推税前', link: 'shgz.html', icon: '🔄', status: 'ok' },
-            { title: '定价测算', desc: '产品定价与利润测算工具', link: 'dj.html', icon: '🏷️', status: 'ok' },
-            { title: '一般劳务税后算税前', desc: '一般劳务已知税后反推税前', link: 'shlwbc.html', icon: '💵', status: 'ok' },
-            { title: '累计预扣法劳务报酬净得算税前', desc: '累计预扣法下，已知劳务报酬净得反推税前', link: 'shljlwbc.html', icon: '📊', status: 'ok' },
-            { title: '累计预扣法劳务报酬税前算净得', desc: '累计预扣法下，已知劳务报酬税前计算净得', link: 'sqljlwbc.html', icon: '🧮', status: 'ok' },
-            { title: '居民个人综合所得汇算清缴计算器', desc: '计算年度综合所得应退或应补税额', link: 'zhsdhsqj.html', icon: '📋', status: 'ok' },
-            { title: '税收滞纳金计算', desc: '计算税收滞纳金金额', link: 'ssznjjs.html', icon: '⏰', status: 'ok' },
-            { title: '自然人出租不动产含税租金算净得', desc: '计算出租不动产的税后净租金收入', link: 'czhssjd.html', icon: '🏠', status: 'ok' },
-            { title: '自然人出租不动产净得租金算含税', desc: '已知净租金收入反推含税租金', link: 'czjdshs.html', icon: '💰', status: 'ok' },
-            { title: '更多工具', desc: '更多实用工具即将上线', link: '', icon: '✨', status: 'dev' }
-        ];
+<div id="printArea"></div><input type="file" id="genericImportInp" accept=".csv" class="hidden" onchange="window.handleGenericImport(this)">
 
-        function renderTools(list, term = '') {
-            const grid = document.getElementById('toolsGrid');
-            const empty = document.getElementById('emptyState');
-            grid.innerHTML = '';
+<div id="bootPage" class="boot"><div class="bootbox">
+<div style="background:linear-gradient(135deg,#1d4ed8,#3b82f6);padding:32px;text-align:center;color:#fff;"><div style="font-size:32px;font-weight:900;letter-spacing:4px;margin-bottom:8px;">财务软件web版模拟实训<span style="font-size:16px;vertical-align:top;color:#bfdbfe;">MAX</span></div><div style="font-size:14px;opacity:.9;">业财一体化联动 · 仅限学习交流 · 学习交流进群加13919499872</div><div style="font-size:12px;opacity:.7;margin-top:8px;font-family:monospace;">[ 真正的感受账务处理从业务到凭证再到科目到报表全流程 ]</div></div>
+<div style="padding:24px;background:var(--bg-body);"><div class="grid-2">
+<div style="background:#fff;padding:24px;border-radius:12px;border:1px solid var(--border);display:flex;flex-direction:column;"><div class="bold mb-3" style="font-size:16px;color:var(--text-main);">➕ 创建新账套</div><div class="alert alert-warn text-xs" style="padding:8px;margin-bottom:16px;">⚠️ 注意：账套创建后，适用的会计准则将永久锁定！</div><div class="mb-3"><label>企业名称 *</label><input id="inName" class="inp" placeholder="例如：甲公司"></div><div class="mb-3"><label>启用月份 *</label><input id="inPeriod" type="month" class="inp" placeholder="格式: YYYY-MM"></div><div class="mb-4"><label>适用会计准则</label><select id="inStd" class="sel"><option value="">[系统默认] 小企业会计准则 (重分类完整版)</option></select></div><button onclick="window.createBook()" class="btn btn-p w-full" style="padding:10px;font-size:14px;margin-top:auto;">创建并初始化账套</button></div>
+<div style="background:#fff;padding:24px;border-radius:12px;border:1px solid var(--border);display:flex;flex-direction:column;"><div class="bold mb-3" style="font-size:16px;color:var(--text-main);">📂 打开已有账套</div><div id="bookListEl" style="flex:1;max-height:280px;overflow-y:auto;padding-right:8px;"><div style="height:140px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);border:2px dashed var(--border);border-radius:8px;background:var(--bg-body);">引擎初始化中...</div></div></div>
+</div></div></div></div>
 
-            if (list.length === 0) {
-                empty.classList.add('active');
-                return;
+<div id="mainPage" class="layout hidden">
+<aside class="sidebar" id="sidebarEl"><div class="logo">财务软件web模拟实训</div><div class="book-bar"><div id="sbName" class="trunc bold" style="color:#fff;font-size:13px;margin-bottom:4px;"></div><div class="flex-between text-xs" style="color:#94a3b8;"><span>当前期间:<span id="sbPeriod" style="color:#4ade80;font-weight:bold;font-family:Consolas;margin-left:4px;"></span></span><span id="sbStatus" class="badge" style="background:rgba(22,163,74,.2);color:#4ade80;">开放中</span></div><div id="sbStd" class="trunc" style="font-size:10px;color:#475569;margin-top:6px;"></div></div><div class="menu-area" id="menuEl"></div><div style="padding:12px;border-top:1px solid #1e293b;min-width:220px;"><button onclick="window.exitBook()" class="btn w-full" style="background:rgba(220,38,38,.1);color:#f87171;border:1px solid rgba(220,38,38,.3);font-weight:bold;">安全关闭当前账套</button></div></aside>
+<main class="main">
+<header class="topbar"><div class="flex-row"><button onclick="window.toggleSidebar()" class="btn btn-text" style="padding:4px 8px;font-size:18px;" title="宽屏沉浸模式 / 展开菜单">☰</button><div id="pageTitle" style="font-size:16px;font-weight:700;color:var(--text-main);margin-left:8px;"></div></div><div id="topClock" class="text-xs color-m mono hidden-mobile">...</div><div class="flex-row"><div id="topBtns" class="flex-row"></div><div style="width:1px;height:24px;background:var(--border);margin:0 8px;"></div><div id="topSyncBtn" class="badge gray" style="cursor:pointer;padding:6px 12px;border:1px solid var(--border);" onclick="window.handleSyncStatusClick()" title="点击恢复自动容灾连接"><span id="tsIcon" style="margin-right:4px;">⚫</span><span id="tsText">未开启自动容灾</span></div></div></header>
+<div class="page" id="pageEl"></div>
+</main>
+</div>
+
+<div id="dlgOverlay" class="overlay hidden"><div class="dlg" id="dlgBox"><div class="flex-between mb-4 pb-2" style="border-bottom:1px solid var(--border);"><div id="dlgTitle" class="bold" style="font-size:16px;color:var(--text-main);"></div><button onclick="window.closeDlg()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text-muted);">&times;</button></div><div id="dlgBody"></div><div class="flex-row mt-3" style="justify-content:flex-end;"><button onclick="window.closeDlg()" class="btn btn-n">取消</button><button onclick="window.confirmDlg()" class="btn btn-p" style="padding:0 24px;">保存确认 (Ctrl+Enter)</button></div></div></div>
+<div id="vDlgOverlay" class="overlay hidden"><div class="dlg dlg-xl"><div class="flex-between mb-3 pb-2" style="border-bottom:1px solid var(--border);"><div id="vDlgTitle" class="bold" style="font-size:16px;"></div><div class="flex-row"><button onclick="if(window.exportVoucherSingle)window.exportVoucherSingle()" class="btn btn-i">导出Excel</button><button onclick="window.closeVDlg()" class="btn btn-n">关闭</button></div></div><div id="vDlgInfo" class="alert alert-info py-2 px-3 flex-row mb-3"></div><div class="table-wrap" style="max-height:50vh;"><table class="tbl" id="vDlgTbl"><thead><tr><th class="tl">摘要</th><th class="tl">科目名称</th><th class="tc">辅助核算</th><th class="tr">数量/外币核算参数</th><th class="tr">借方金额</th><th class="tr">贷方金额</th></tr></thead><tbody id="vDlgBody"></tbody></table></div></div></div>
+
+<script>
+// ==========================================
+// 1. 全局变量与终极配置常数 (小企业会计准则-重分类完整版)
+// ==========================================
+var STD_ACCS=[{"code":"1001","name":"库存现金","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1002","name":"银行存款","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1012","name":"其他货币资金","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1101","name":"短期投资","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"110101","name":"股票","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"110102","name":"债券","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"110103","name":"基金","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"110110","name":"其他","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1121","name":"应收票据","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1122","name":"应收账款","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1123","name":"预付账款","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1131","name":"应收股利","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1132","name":"应收利息","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1221","name":"其他应收款","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1401","name":"材料采购","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1402","name":"在途物资","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1403","name":"原材料","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1404","name":"材料成本差异","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1405","name":"库存商品","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1407","name":"商品进销差价","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1408","name":"委托加工物资","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1411","name":"周转材料","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1421","name":"消耗性生物资产","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1501","name":"长期债券投资","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"150101","name":"债券投资","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"150102","name":"其他债权投资","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1511","name":"长期股权投资","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"151101","name":"股票投资","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"151102","name":"其他股权投资","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1601","name":"固定资产","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1602","name":"累计折旧","direction":"贷","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1604","name":"在建工程","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"160401","name":"建筑工程","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"160402","name":"安装工程","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"160403","name":"技术改造工程","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"160404","name":"其他支出","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1605","name":"工程物资","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1606","name":"固定资产清理","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1621","name":"生产性生物资产","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1622","name":"生产性生物资产累计折旧","direction":"贷","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1701","name":"无形资产","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1702","name":"累计摊销","direction":"贷","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1801","name":"长期待摊费用","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"1901","name":"待处理财产损溢","direction":"借","type":"资产","currency":"","initBal":0,"initFcBal":0},{"code":"2001","name":"短期借款","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"2201","name":"应付票据","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"2202","name":"应付账款","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"2203","name":"预收账款","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"2211","name":"应付职工薪酬","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"2221","name":"应交税费","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"222101","name":"应交增值税","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"22210101","name":"进项税额","direction":"借","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"22210102","name":"销项税额的抵减","direction":"借","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"22210103","name":"已交税金","direction":"借","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"22210104","name":"转出未交增值税","direction":"借","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"22210105","name":"减免税款","direction":"借","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"22210106","name":"出口抵减内销产品应纳税额","direction":"借","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"22210107","name":"销项税额","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"22210108","name":"出口退税","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"22210109","name":"进项税额转出","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"22210110","name":"转出多交增值税","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"222102","name":"未交增值税","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"222103","name":"预交增值税","direction":"借","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"222104","name":"待抵扣进项税额","direction":"借","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"222105","name":"待认证进项税额","direction":"借","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"222106","name":"待转销项税额","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"222107","name":"增值税留抵税额","direction":"借","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"222108","name":"简易计税","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"222109","name":"转让金融商品应交增值税","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"222110","name":"代扣代交增值税","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"222111","name":"应交所得税","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"222112","name":"应交个人所得税","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"222113","name":"教育费附加","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"222114","name":"地方教育费附加","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"222115","name":"应交资源税","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"222116","name":"应交土地增值税","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"222117","name":"应交城市维护建设税","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"222118","name":"应交房产税","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"222119","name":"应交土地使用税","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"222120","name":"应交车船使用税","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"222121","name":"应交消费税","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"2231","name":"应付利息","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"2232","name":"应付利润","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"2241","name":"其他应付款","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"2401","name":"递延收益","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"2501","name":"长期借款","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"2701","name":"长期应付款","direction":"贷","type":"负债","currency":"","initBal":0,"initFcBal":0},{"code":"3001","name":"实收资本","direction":"贷","type":"权益","currency":"","initBal":0,"initFcBal":0},{"code":"3002","name":"资本公积","direction":"贷","type":"权益","currency":"","initBal":0,"initFcBal":0},{"code":"300201","name":"资本溢价","direction":"贷","type":"权益","currency":"","initBal":0,"initFcBal":0},{"code":"300202","name":"接受捐赠非现金资产准备","direction":"贷","type":"权益","currency":"","initBal":0,"initFcBal":0},{"code":"300206","name":"外币资本折算差额","direction":"贷","type":"权益","currency":"","initBal":0,"initFcBal":0},{"code":"300207","name":"其他资本公积","direction":"贷","type":"权益","currency":"","initBal":0,"initFcBal":0},{"code":"3101","name":"盈余公积","direction":"贷","type":"权益","currency":"","initBal":0,"initFcBal":0},{"code":"310101","name":"法定盈余公积","direction":"贷","type":"权益","currency":"","initBal":0,"initFcBal":0},{"code":"310102","name":"任意盈余公积","direction":"贷","type":"权益","currency":"","initBal":0,"initFcBal":0},{"code":"310103","name":"法定公益金","direction":"贷","type":"权益","currency":"","initBal":0,"initFcBal":0},{"code":"3103","name":"本年利润","direction":"贷","type":"权益","currency":"","initBal":0,"initFcBal":0},{"code":"3104","name":"利润分配","direction":"贷","type":"权益","currency":"","initBal":0,"initFcBal":0},{"code":"310401","name":"其他转入","direction":"借","type":"权益","currency":"","initBal":0,"initFcBal":0},{"code":"310402","name":"提取法定盈余公积","direction":"借","type":"权益","currency":"","initBal":0,"initFcBal":0},{"code":"310403","name":"提取法定公益金","direction":"借","type":"权益","currency":"","initBal":0,"initFcBal":0},{"code":"310409","name":"提取任意盈余公积","direction":"借","type":"权益","currency":"","initBal":0,"initFcBal":0},{"code":"310410","name":"应付利润","direction":"借","type":"权益","currency":"","initBal":0,"initFcBal":0},{"code":"310411","name":"转作资本的利润","direction":"借","type":"权益","currency":"","initBal":0,"initFcBal":0},{"code":"310415","name":"未分配利润","direction":"贷","type":"权益","currency":"","initBal":0,"initFcBal":0},{"code":"4001","name":"生产成本","direction":"借","type":"成本","currency":"","initBal":0,"initFcBal":0},{"code":"400101","name":"基本生产成本","direction":"借","type":"成本","currency":"","initBal":0,"initFcBal":0},{"code":"400102","name":"辅助生产成本","direction":"借","type":"成本","currency":"","initBal":0,"initFcBal":0},{"code":"4101","name":"制造费用","direction":"借","type":"成本","currency":"","initBal":0,"initFcBal":0},{"code":"4301","name":"研发支出","direction":"借","type":"成本","currency":"","initBal":0,"initFcBal":0},{"code":"4401","name":"工程施工","direction":"借","type":"成本","currency":"","initBal":0,"initFcBal":0},{"code":"4403","name":"机械作业","direction":"借","type":"成本","currency":"","initBal":0,"initFcBal":0},{"code":"5001","name":"主营业务收入","direction":"贷","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"5051","name":"其他业务收入","direction":"贷","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"5111","name":"投资收益","direction":"贷","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"5301","name":"营业外收入","direction":"贷","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"530101","name":"非流动资产处置净收益","direction":"贷","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"530102","name":"政府补助","direction":"贷","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"530103","name":"捐赠收益","direction":"贷","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"530104","name":"盘盈收益","direction":"贷","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"530105","name":"其他","direction":"贷","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"5401","name":"主营业务成本","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"5402","name":"其他业务成本","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"5403","name":"税金及附加","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"540301","name":"消费税","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"540303","name":"城市维护建设税","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"540304","name":"资源税","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"540305","name":"土地增值税","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"540306","name":"城镇土地使用税","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"540307","name":"房产税","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"540308","name":"车船税","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"540309","name":"印花税","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"540310","name":"教育费附加","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"540311","name":"矿产资源补偿费","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"540312","name":"排污费","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"540313","name":"地方教育费附加","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"5601","name":"销售费用","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560101","name":"办公用品","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560102","name":"房租","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560103","name":"物业管理费","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560104","name":"水电费","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560105","name":"交际应酬费","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560106","name":"市内交通费","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560107","name":"差旅费","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560108","name":"补助","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560109","name":"通讯费","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560110","name":"工资","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560111","name":"佣金","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560112","name":"保险金","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560113","name":"福利费","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560114","name":"累计折旧","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560115","name":"商品维修费","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560116","name":"广告和业务宣传费","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560199","name":"其他","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"5602","name":"管理费用","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560201","name":"办公用品","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560202","name":"房租","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560203","name":"物业管理费","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560204","name":"水电费","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560205","name":"交际应酬费","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560206","name":"市内交通费","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560207","name":"差旅费","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560208","name":"通讯费","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560209","name":"工资","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560210","name":"保险金","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560211","name":"福利费","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560212","name":"累计折旧","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560213","name":"开办费","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560214","name":"职工教育经费","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560215","name":"研究费用","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560299","name":"其他","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"5603","name":"财务费用","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560301","name":"汇兑损益","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560302","name":"利息","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560303","name":"手续费","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"560399","name":"其他","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"5711","name":"营业外支出","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"571101","name":"存货盘亏毁损","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"571102","name":"非流动资产处置净损失","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"571103","name":"坏账损失","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"571104","name":"无法收回的长期债券投资损失","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"571105","name":"无法收回的长期股权投资损失","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"571106","name":"自然灾害等不可抗力造成的损失","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"571107","name":"税收滞纳金","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"571108","name":"罚金、罚款","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"571109","name":"捐赠支出","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"571110","name":"其他","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0},{"code":"5801","name":"所得税费用","direction":"借","type":"损益","currency":"","initBal":0,"initFcBal":0}];
+var CF_ITEMS=[{code:'cf1',type:'in',name:'销售商品、提供劳务收到的现金'},{code:'cf2',type:'in',name:'收到的税费返还'},{code:'cf3',type:'in',name:'收到其他与经营活动有关的现金'},{code:'cf4',type:'out',name:'购买商品、接受劳务支付的现金'},{code:'cf5',type:'out',name:'支付给职工以及为职工支付的现金'},{code:'cf6',type:'out',name:'支付的各项税费'},{code:'cf7',type:'out',name:'支付其他与经营活动有关的现金'},{code:'cf8',type:'in',name:'收回投资收到的现金'},{code:'cf9',type:'in',name:'取得投资收益收到的现金'},{code:'cf10',type:'in',name:'处置固定资产、无形资产等收回的现金净额'},{code:'cf11',type:'out',name:'购建固定资产、无形资产等支付的现金'},{code:'cf12',type:'out',name:'投资支付的现金'},{code:'cf13',type:'in',name:'吸收投资收到的现金'},{code:'cf14',type:'in',name:'取得借款收到的现金'},{code:'cf15',type:'out',name:'偿还债务支付的现金'},{code:'cf16',type:'out',name:'分配股利、利润或偿付利息支付的现金'}];
+var DEFAULT_REPORTS={"bs_reclass":{"title":"资产负债表 (重分类)","data":[{"n":"流动资产：","isT":1,"col":1},{"n":"    货币资金","f":"M('1001')+M('1002')+M('1012')","fb":"MB('1001')+MB('1002')+MB('1012')","col":1},{"n":"    短期投资","f":"M('1101')","fb":"MB('1101')","col":1},{"n":"    应收票据","f":"M('1121')","fb":"MB('1121')","col":1},{"n":"    应收账款","f":"Math.max(M('1122'),0) + Math.max(-M('2203'),0)","fb":"Math.max(MB('1122'),0) + Math.max(-MB('2203'),0)","col":1},{"n":"    预付账款","f":"Math.max(M('1123'),0) + Math.max(-M('2202'),0)","fb":"Math.max(MB('1123'),0) + Math.max(-MB('2202'),0)","col":1},{"n":"    应收股利","f":"M('1131')","fb":"MB('1131')","col":1},{"n":"    应收利息","f":"M('1132')","fb":"MB('1132')","col":1},{"n":"    其他应收款","f":"M('1221')","fb":"MB('1221')","col":1},{"n":"    存货","f":"M('14')+M('40')","fb":"MB('14')+MB('40')","col":1},{"n":"        其中：原材料","f":"M('1403')","fb":"MB('1403')","col":1},{"n":"              在产品","f":"M('4001')","fb":"MB('4001')","col":1},{"n":"              库存商品","f":"M('1405')","fb":"MB('1405')","col":1},{"n":"    周转材料","f":"M('1411')","fb":"MB('1411')","col":1},{"n":"    其他流动资产","f":"","fb":"","col":1},{"n":"         流动资产合计","isT":1,"f":"M('1001')+M('1002')+M('1012')+M('1101')+M('1121')+(Math.max(M('1122'),0) + Math.max(-M('2203'),0))+(Math.max(M('1123'),0) + Math.max(-M('2202'),0))+M('1131')+M('1132')+M('1221')+M('14')+M('40')+M('1411')","fb":"MB('1001')+MB('1002')+MB('1012')+MB('1101')+MB('1121')+(Math.max(MB('1122'),0) + Math.max(-MB('2203'),0))+(Math.max(MB('1123'),0) + Math.max(-MB('2202'),0))+MB('1131')+MB('1132')+MB('1221')+MB('14')+MB('40')+MB('1411')","col":1},{"n":"非流动资产：","isT":1,"col":1},{"n":"    长期债券投资","f":"M('1501')","fb":"MB('1501')","col":1},{"n":"    长期股权投资","f":"M('1511')","fb":"MB('1511')","col":1},{"n":"    固定资产原价","f":"M('1601')","fb":"MB('1601')","col":1},{"n":"    减：累计折旧","f":"M('1602')","fb":"MB('1602')","col":1},{"n":"    固定资产账面价值","f":"M('1601')-M('1602')","fb":"MB('1601')-MB('1602')","col":1},{"n":"    在建工程","f":"M('1604')","fb":"MB('1604')","col":1},{"n":"    工程物资","f":"M('1605')","fb":"MB('1605')","col":1},{"n":"    固定资产清理","f":"M('1606')","fb":"MB('1606')","col":1},{"n":"    生产性生物资产","f":"M('1621')-M('1622')","fb":"MB('1621')-MB('1622')","col":1},{"n":"    无形资产","f":"M('1701')-M('1702')","fb":"MB('1701')-MB('1702')","col":1},{"n":"    开发支出","f":"","fb":"","col":1},{"n":"    长期待摊费用","f":"M('1801')","fb":"MB('1801')","col":1},{"n":"    其他非流动资产","f":"","fb":"","col":1},{"n":"         非流动资产合计","isT":1,"f":"M('1501')+M('1511')+M('1601')-M('1602')+M('1604')+M('1605')+M('1606')+M('1621')-M('1622')+M('1701')-M('1702')+M('1801')","fb":"MB('1501')+MB('1511')+MB('1601')-MB('1602')+MB('1604')+MB('1605')+MB('1606')+MB('1621')-MB('1622')+MB('1701')-MB('1702')+MB('1801')","col":1},{"n":"            资产总计","isT":1,"f":"M('1001')+M('1002')+M('1012')+M('1101')+M('1121')+(Math.max(M('1122'),0) + Math.max(-M('2203'),0))+(Math.max(M('1123'),0) + Math.max(-M('2202'),0))+M('1131')+M('1132')+M('1221')+M('14')+M('40')+M('1411')+M('1501')+M('1511')+M('1601')-M('1602')+M('1604')+M('1605')+M('1606')+M('1621')-M('1622')+M('1701')-M('1702')+M('1801')","fb":"MB('1001')+MB('1002')+MB('1012')+MB('1101')+MB('1121')+(Math.max(MB('1122'),0) + Math.max(-MB('2203'),0))+(Math.max(MB('1123'),0) + Math.max(-MB('2202'),0))+MB('1131')+MB('1132')+MB('1221')+MB('14')+MB('40')+MB('1411')+MB('1501')+MB('1511')+MB('1601')-MB('1602')+MB('1604')+MB('1605')+MB('1606')+MB('1621')-MB('1622')+MB('1701')-MB('1702')+MB('1801')","col":1},{"n":"流动负债：","isT":1,"col":2},{"n":"    短期借款","f":"M('2001')","fb":"MB('2001')","col":2},{"n":"    应付票据","f":"M('2201')","fb":"MB('2201')","col":2},{"n":"    应付账款","f":"Math.max(M('2202'),0) + Math.max(-M('1123'),0)","fb":"Math.max(MB('2202'),0) + Math.max(-MB('1123'),0)","col":2},{"n":"    预收账款","f":"Math.max(M('2203'),0) + Math.max(-M('1122'),0)","fb":"Math.max(MB('2203'),0) + Math.max(-MB('1122'),0)","col":2},{"n":"    应付职工薪酬","f":"M('2211')","fb":"MB('2211')","col":2},{"n":"    应交税费","f":"M('2221')","fb":"MB('2221')","col":2},{"n":"    应付利息","f":"M('2231')","fb":"MB('2231')","col":2},{"n":"    应付利润","f":"M('2232')","fb":"MB('2232')","col":2},{"n":"    其他应付款","f":"M('2241')","fb":"MB('2241')","col":2},{"n":"    其他流动负债","f":"","fb":"","col":2},{"n":"         流动负债合计","isT":1,"f":"M('2001')+M('2201')+(Math.max(M('2202'),0) + Math.max(-M('1123'),0))+(Math.max(M('2203'),0) + Math.max(-M('1122'),0))+M('2211')+M('2221')+M('2231')+M('2232')+M('2241')","fb":"MB('2001')+MB('2201')+(Math.max(MB('2202'),0) + Math.max(-MB('1123'),0))+(Math.max(MB('2203'),0) + Math.max(-MB('1122'),0))+MB('2211')+MB('2221')+MB('2231')+MB('2232')+MB('2241')","col":2},{"n":"非流动负债：","isT":1,"col":2},{"n":"    长期借款","f":"M('2501')","fb":"MB('2501')","col":2},{"n":"    长期应付款","f":"M('2701')","fb":"MB('2701')","col":2},{"n":"    递延收益","f":"M('2401')","fb":"MB('2401')","col":2},{"n":"    其他非流动负债","f":"","fb":"","col":2},{"n":"       非流动负债合计","isT":1,"f":"M('2501')+M('2701')+M('2401')","fb":"MB('2501')+MB('2701')+MB('2401')","col":2},{"n":"          负债合计","isT":1,"f":"M('2001')+M('2201')+(Math.max(M('2202'),0) + Math.max(-M('1123'),0))+(Math.max(M('2203'),0) + Math.max(-M('1122'),0))+M('2211')+M('2221')+M('2231')+M('2232')+M('2241')+M('2501')+M('2701')+M('2401')","fb":"MB('2001')+MB('2201')+(Math.max(MB('2202'),0) + Math.max(-MB('1123'),0))+(Math.max(MB('2203'),0) + Math.max(-MB('1122'),0))+MB('2211')+MB('2221')+MB('2231')+MB('2232')+MB('2241')+MB('2501')+MB('2701')+MB('2401')","col":2},{"n":" ","f":"","fb":"","col":2},{"n":" ","f":"","fb":"","col":2},{"n":" ","f":"","fb":"","col":2},{"n":" ","f":"","fb":"","col":2},{"n":" ","f":"","fb":"","col":2},{"n":" ","f":"","fb":"","col":2},{"n":"所有者权益：","isT":1,"col":2},{"n":"    实收资本","f":"M('3001')","fb":"MB('3001')","col":2},{"n":"    资本公积","f":"M('3002')","fb":"MB('3002')","col":2},{"n":"    盈余公积","f":"M('3101')","fb":"MB('3101')","col":2},{"n":"    未分配利润","f":"M('3103')+M('3104')+PM()","fb":"MB('3103')+MB('3104')+PMB()","col":2},{"n":"       所有者权益合计","isT":1,"f":"M('3001')+M('3002')+M('3101')+M('3103')+M('3104')+PM()","fb":"MB('3001')+MB('3002')+MB('3101')+MB('3103')+MB('3104')+PMB()","col":2},{"n":"          负债和权益总计","isT":1,"f":"M('2001')+M('2201')+(Math.max(M('2202'),0) + Math.max(-M('1123'),0))+(Math.max(M('2203'),0) + Math.max(-M('1122'),0))+M('2211')+M('2221')+M('2231')+M('2232')+M('2241')+M('2501')+M('2701')+M('2401')+M('3001')+M('3002')+M('3101')+M('3103')+M('3104')+PM()","fb":"MB('2001')+MB('2201')+(Math.max(MB('2202'),0) + Math.max(-MB('1123'),0))+(Math.max(MB('2203'),0) + Math.max(-MB('1122'),0))+MB('2211')+MB('2221')+MB('2231')+MB('2232')+MB('2241')+MB('2501')+MB('2701')+MB('2401')+MB('3001')+MB('3002')+MB('3101')+MB('3103')+MB('3104')+PMB()","col":2}]},"bs_std":{"title":"资产负债表 (余额法)","data":[{"n":"流动资产：","isT":1,"col":1},{"n":"    货币资金","f":"M('1001')+M('1002')+M('1012')","fb":"MB('1001')+MB('1002')+MB('1012')","col":1},{"n":"    短期投资","f":"M('1101')","fb":"MB('1101')","col":1},{"n":"    应收票据","f":"M('1121')","fb":"MB('1121')","col":1},{"n":"    应收账款","f":"M('1122')","fb":"MB('1122')","col":1},{"n":"    预付账款","f":"M('1123')","fb":"MB('1123')","col":1},{"n":"    应收股利","f":"M('1131')","fb":"MB('1131')","col":1},{"n":"    应收利息","f":"M('1132')","fb":"MB('1132')","col":1},{"n":"    其他应收款","f":"M('1221')","fb":"MB('1221')","col":1},{"n":"    存货","f":"M('14')+M('40')","fb":"MB('14')+MB('40')","col":1},{"n":"        其中：原材料","f":"M('1403')","fb":"MB('1403')","col":1},{"n":"              在产品","f":"M('4001')","fb":"MB('4001')","col":1},{"n":"              库存商品","f":"M('1405')","fb":"MB('1405')","col":1},{"n":"    周转材料","f":"M('1411')","fb":"MB('1411')","col":1},{"n":"    其他流动资产","f":"","fb":"","col":1},{"n":"         流动资产合计","isT":1,"f":"M('1001')+M('1002')+M('1012')+M('1101')+M('1121')+M('1122')+M('1123')+M('1131')+M('1132')+M('1221')+M('14')+M('40')+M('1411')","fb":"MB('1001')+MB('1002')+MB('1012')+MB('1101')+MB('1121')+MB('1122')+MB('1123')+MB('1131')+MB('1132')+MB('1221')+MB('14')+MB('40')+MB('1411')","col":1},{"n":"非流动资产：","isT":1,"col":1},{"n":"    长期债券投资","f":"M('1501')","fb":"MB('1501')","col":1},{"n":"    长期股权投资","f":"M('1511')","fb":"MB('1511')","col":1},{"n":"    固定资产原价","f":"M('1601')","fb":"MB('1601')","col":1},{"n":"    减：累计折旧","f":"M('1602')","fb":"MB('1602')","col":1},{"n":"    固定资产账面价值","f":"M('1601')-M('1602')","fb":"MB('1601')-MB('1602')","col":1},{"n":"    在建工程","f":"M('1604')","fb":"MB('1604')","col":1},{"n":"    工程物资","f":"M('1605')","fb":"MB('1605')","col":1},{"n":"    固定资产清理","f":"M('1606')","fb":"MB('1606')","col":1},{"n":"    生产性生物资产","f":"M('1621')-M('1622')","fb":"MB('1621')-MB('1622')","col":1},{"n":"    无形资产","f":"M('1701')-M('1702')","fb":"MB('1701')-MB('1702')","col":1},{"n":"    开发支出","f":"","fb":"","col":1},{"n":"    长期待摊费用","f":"M('1801')","fb":"MB('1801')","col":1},{"n":"    其他非流动资产","f":"","fb":"","col":1},{"n":"         非流动资产合计","isT":1,"f":"M('1501')+M('1511')+M('1601')-M('1602')+M('1604')+M('1605')+M('1606')+M('1621')-M('1622')+M('1701')-M('1702')+M('1801')","fb":"MB('1501')+MB('1511')+MB('1601')-MB('1602')+MB('1604')+MB('1605')+MB('1606')+MB('1621')-MB('1622')+MB('1701')-MB('1702')+MB('1801')","col":1},{"n":"            资产总计","isT":1,"f":"M('1001')+M('1002')+M('1012')+M('1101')+M('1121')+M('1122')+M('1123')+M('1131')+M('1132')+M('1221')+M('14')+M('40')+M('1411')+M('1501')+M('1511')+M('1601')-M('1602')+M('1604')+M('1605')+M('1606')+M('1621')-M('1622')+M('1701')-M('1702')+M('1801')","fb":"MB('1001')+MB('1002')+MB('1012')+MB('1101')+MB('1121')+MB('1122')+MB('1123')+MB('1131')+MB('1132')+MB('1221')+MB('14')+MB('40')+MB('1411')+MB('1501')+MB('1511')+MB('1601')-MB('1602')+MB('1604')+MB('1605')+MB('1606')+MB('1621')-MB('1622')+MB('1701')-MB('1702')+MB('1801')","col":1},{"n":"流动负债：","isT":1,"col":2},{"n":"    短期借款","f":"M('2001')","fb":"MB('2001')","col":2},{"n":"    应付票据","f":"M('2201')","fb":"MB('2201')","col":2},{"n":"    应付账款","f":"M('2202')","fb":"MB('2202')","col":2},{"n":"    预收账款","f":"M('2203')","fb":"MB('2203')","col":2},{"n":"    应付职工薪酬","f":"M('2211')","fb":"MB('2211')","col":2},{"n":"    应交税费","f":"M('2221')","fb":"MB('2221')","col":2},{"n":"    应付利息","f":"M('2231')","fb":"MB('2231')","col":2},{"n":"    应付利润","f":"M('2232')","fb":"MB('2232')","col":2},{"n":"    其他应付款","f":"M('2241')","fb":"MB('2241')","col":2},{"n":"    其他流动负债","f":"","fb":"","col":2},{"n":"         流动负债合计","isT":1,"f":"M('2001')+M('2201')+M('2202')+M('2203')+M('2211')+M('2221')+M('2231')+M('2232')+M('2241')","fb":"MB('2001')+MB('2201')+MB('2202')+MB('2203')+MB('2211')+MB('2221')+MB('2231')+MB('2232')+MB('2241')","col":2},{"n":"非流动负债：","isT":1,"col":2},{"n":"    长期借款","f":"M('2501')","fb":"MB('2501')","col":2},{"n":"    长期应付款","f":"M('2701')","fb":"MB('2701')","col":2},{"n":"    递延收益","f":"M('2401')","fb":"MB('2401')","col":2},{"n":"    其他非流动负债","f":"","fb":"","col":2},{"n":"       非流动负债合计","isT":1,"f":"M('2501')+M('2701')+M('2401')","fb":"MB('2501')+MB('2701')+MB('2401')","col":2},{"n":"          负债合计","isT":1,"f":"M('2001')+M('2201')+M('2202')+M('2203')+M('2211')+M('2221')+M('2231')+M('2232')+M('2241')+M('2501')+M('2701')+M('2401')","fb":"MB('2001')+MB('2201')+MB('2202')+MB('2203')+MB('2211')+MB('2221')+MB('2231')+MB('2232')+MB('2241')+MB('2501')+MB('2701')+MB('2401')","col":2},{"n":" ","f":"","fb":"","col":2},{"n":" ","f":"","fb":"","col":2},{"n":" ","f":"","fb":"","col":2},{"n":" ","f":"","fb":"","col":2},{"n":" ","f":"","fb":"","col":2},{"n":" ","f":"","fb":"","col":2},{"n":"所有者权益：","isT":1,"col":2},{"n":"    实收资本","f":"M('3001')","fb":"MB('3001')","col":2},{"n":"    资本公积","f":"M('3002')","fb":"MB('3002')","col":2},{"n":"    盈余公积","f":"M('3101')","fb":"MB('3101')","col":2},{"n":"    未分配利润","f":"M('3103')+M('3104')+PM()","fb":"MB('3103')+MB('3104')+PMB()","col":2},{"n":"       所有者权益合计","isT":1,"f":"M('3001')+M('3002')+M('3101')+M('3103')+M('3104')+PM()","fb":"MB('3001')+MB('3002')+MB('3101')+MB('3103')+MB('3104')+PMB()","col":2},{"n":"          负债和权益总计","isT":1,"f":"M('2001')+M('2201')+M('2202')+M('2203')+M('2211')+M('2221')+M('2231')+M('2232')+M('2241')+M('2501')+M('2701')+M('2401')+M('3001')+M('3002')+M('3101')+M('3103')+M('3104')+PM()","fb":"MB('2001')+MB('2201')+MB('2202')+MB('2203')+MB('2211')+MB('2221')+MB('2231')+MB('2232')+MB('2241')+MB('2501')+MB('2701')+MB('2401')+MB('3001')+MB('3002')+MB('3101')+MB('3103')+MB('3104')+PMB()","col":2}]},"is":{"title":"利润表","data":[{"n":"一、 营业收入","f":"CY('5001')+CY('5051')","fb":"C('5001')+C('5051')","isT":1},{"n":"      减：营业成本","f":"DY('5401')+DY('5402')","fb":"D('5401')+D('5402')"},{"n":"      税金及附加","f":"DY('5403')","fb":"D('5403')"},{"n":"           其中：消费税","f":"DY('540301')","fb":"D('540301')"},{"n":"                     城市维护建设税","f":"DY('540303')","fb":"D('540303')"},{"n":"                     资源税","f":"DY('540304')","fb":"D('540304')"},{"n":"                     土地增值税","f":"DY('540305')","fb":"D('540305')"},{"n":"                     城镇土地使用税等","f":"DY('540306')+DY('540307')+DY('540308')+DY('540309')","fb":"D('540306')+D('540307')+D('540308')+D('540309')"},{"n":"                     教育费附加等","f":"DY('540310')+DY('540311')+DY('540312')","fb":"D('540310')+D('540311')+D('540312')"},{"n":"      销售费用","f":"DY('5601')","fb":"D('5601')"},{"n":"           其中：商品维修费","f":"DY('560115')","fb":"D('560115')"},{"n":"                     广告费和业务宣传费","f":"DY('560116')","fb":"D('560116')"},{"n":"      管理费用","f":"DY('5602')","fb":"D('5602')"},{"n":"           其中：开办费","f":"DY('560213')","fb":"D('560213')"},{"n":"                     业务招待费","f":"DY('560205')","fb":"D('560205')"},{"n":"                     研究费用","f":"DY('560215')","fb":"D('560215')"},{"n":"      财务费用","f":"DY('5603')","fb":"D('5603')"},{"n":"           其中：利息费用（收入以“-”号填列）","f":"DY('560302')","fb":"D('560302')"},{"n":"      加： 投资收益（损失以“-”号填列）","f":"CY('5111')-DY('5111')","fb":"C('5111')-D('5111')"},{"n":"二、营业利润（亏损以“-”号填列）","f":"CY('5001')+CY('5051')-DY('5401')-DY('5402')-DY('5403')-DY('5601')-DY('5602')-DY('5603')+(CY('5111')-DY('5111'))","fb":"C('5001')+C('5051')-D('5401')-D('5402')-D('5403')-D('5601')-D('5602')-D('5603')+(C('5111')-D('5111'))","isT":1},{"n":"      加：营业外收入","f":"CY('5301')","fb":"C('5301')"},{"n":"             其中： 政府补助","f":"CY('530102')","fb":"C('530102')"},{"n":"      减：营业外支出","f":"DY('5711')","fb":"D('5711')"},{"n":"             其中： 坏账损失","f":"DY('571103')","fb":"D('571103')"},{"n":"                        无法收回的长期投资损失","f":"DY('571104')+DY('571105')","fb":"D('571104')+D('571105')"},{"n":"                        自然灾害等不可抗力损失","f":"DY('571106')","fb":"D('571106')"},{"n":"                        税收滞纳金","f":"DY('571107')","fb":"D('571107')"},{"n":"三、利润总额（亏损总额以“-”号填列）","f":"CY('5001')+CY('5051')-DY('5401')-DY('5402')-DY('5403')-DY('5601')-DY('5602')-DY('5603')+(CY('5111')-DY('5111'))+CY('5301')-DY('5711')","fb":"C('5001')+C('5051')-D('5401')-D('5402')-D('5403')-D('5601')-D('5602')-D('5603')+(C('5111')-D('5111'))+C('5301')-D('5711')","isT":1},{"n":"      减：所得税费用","f":"DY('5801')","fb":"D('5801')"},{"n":"四、净利润（净亏损以“-”号填列）","f":"CY('5001')+CY('5051')-DY('5401')-DY('5402')-DY('5403')-DY('5601')-DY('5602')-DY('5603')+(CY('5111')-DY('5111'))+CY('5301')-DY('5711')-DY('5801')","fb":"C('5001')+C('5051')-D('5401')-D('5402')-D('5403')-D('5601')-D('5602')-D('5603')+(C('5111')-D('5111'))+C('5301')-D('5711')-D('5801')","isT":1}]},"cf":{"title":"现金流量表(公式法)","data":[{"n":"一、经营活动产生的现金流量：","isH":1},{"n":"销售产成品、商品、提供劳务收到的现金","f":"C('5001')+C('5051')+C('222100105')+MB('1122')-M('1122')+MB('1121')-M('1121')+M('2203')-MB('2203')","fb":"CY('5001')+CY('5051')+CY('222100105')+MB('1122')-M('1122')+MB('1121')-M('1121')+M('2203')-MB('2203')"},{"n":"收到其他与经营活动有关的现金","f":"C('5301')","fb":"CY('5301')"},{"n":"购买原材料、商品、接受劳务支付的现金","f":"D('5401')+D('5402')+D('222100101')+M('14')-MB('14')+MB('2202')-M('2202')+MB('2201')-M('2201')+M('1123')-MB('1123')","fb":"DY('5401')+DY('5402')+DY('222100101')+M('14')-MB('14')+MB('2202')-M('2202')+MB('2201')-M('2201')+M('1123')-MB('1123')"},{"n":"支付的职工薪酬","f":"D('2211')","fb":"DY('2211')"},{"n":"支付的税费","f":"D('2221')","fb":"DY('2221')"},{"n":"支付其他与经营活动有关的现金","f":"D('5601')+D('5602')+D('5711')-D('5601001')-D('5602001')-D('5601007')-D('5602007')","fb":"DY('5601')+DY('5602')+DY('5711')-DY('5601001')-DY('5602001')-DY('5601007')-DY('5602007')"},{"n":"经营活动产生的现金流量净额","isT":1,"f":"(C('5001')+C('5051')+C('222100105')+MB('1122')-M('1122')+MB('1121')-M('1121')+M('2203')-MB('2203') + C('5301')) - (D('5401')+D('5402')+D('222100101')+M('14')-MB('14')+MB('2202')-M('2202')+MB('2201')-M('2201')+M('1123')-MB('1123') + D('2211') + D('2221') + (D('5601')+D('5602')+D('5711')-D('5601001')-D('5602001')-D('5601007')-D('5602007')))","fb":"(CY('5001')+CY('5051')+CY('222100105')+MB('1122')-M('1122')+MB('1121')-M('1121')+M('2203')-MB('2203') + CY('5301')) - (DY('5401')+DY('5402')+DY('222100101')+M('14')-MB('14')+MB('2202')-M('2202')+MB('2201')-M('2201')+M('1123')-MB('1123') + DY('2211') + DY('2221') + (DY('5601')+DY('5602')+DY('5711')-DY('5601001')-DY('5602001')-DY('5601007')-DY('5602007')))"},{"n":"二、投资活动产生的现金流量：","isH":1},{"n":"收回短期投资、长期投资收到的现金","f":"CR('1101')+CR('1501')+CR('1511')","fb":"CRY('1101')+CRY('1501')+CRY('1511')"},{"n":"取得投资收益收到的现金","f":"CR('1131')+CR('1132')+C('5111')","fb":"CRY('1131')+CRY('1132')+CY('5111')"},{"n":"处置固定资产等收回的现金净额","f":"CR('1606')+C('5301001')","fb":"CRY('1606')+CY('5301001')"},{"n":"投资支付的现金","f":"DR('1101')+DR('1501')+DR('1511')","fb":"DRY('1101')+DRY('1501')+DRY('1511')"},{"n":"购建固定资产等支付的现金","f":"DR('1601')+DR('1604')+DR('1605')+DR('1701')","fb":"DRY('1601')+DRY('1604')+DRY('1605')+DRY('1701')"},{"n":"投资活动产生的现金流量净额","isT":1,"f":"(CR('1101')+CR('1501')+CR('1511')+CR('1131')+CR('1132')+C('5111')+CR('1606')+C('5301001')) - (DR('1101')+DR('1501')+DR('1511')+DR('1601')+DR('1604')+DR('1605')+DR('1701'))","fb":"(CRY('1101')+CRY('1501')+CRY('1511')+CRY('1131')+CRY('1132')+CY('5111')+CRY('1606')+CY('5301001')) - (DRY('1101')+DRY('1501')+DRY('1511')+DRY('1601')+DRY('1604')+DRY('1605')+DRY('1701'))"},{"n":"三、筹资活动产生的现金流量：","isH":1},{"n":"取得借款收到的现金","f":"CR('2001')+CR('2501')","fb":"CRY('2001')+CRY('2501')"},{"n":"吸收投资者投资收到的现金","f":"CR('3001')+CR('3002')","fb":"CRY('3001')+CRY('3002')"},{"n":"偿还借款本金支付的现金","f":"DR('2001')+DR('2501')","fb":"DRY('2001')+DRY('2501')"},{"n":"偿还借款利息支付的现金","f":"DR('2231')+D('5603001')","fb":"DRY('2231')+DY('5603001')"},{"n":"分配利润支付的现金","f":"DR('2232')","fb":"DRY('2232')"},{"n":"筹资活动产生的现金流量净额","isT":1,"f":"(CR('2001')+CR('2501')+CR('3001')+CR('3002')) - (DR('2001')+DR('2501')+DR('2231')+D('5603001')+DR('2232'))","fb":"(CRY('2001')+CRY('2501')+CRY('3001')+CRY('3002')) - (DRY('2001')+DRY('2501')+DRY('2231')+DY('5603001')+DRY('2232'))"},{"n":"四、现金净增加额","isH":1,"f":"(DR('1001')+DR('1002')+DR('1012'))-(CR('1001')+CR('1002')+CR('1012'))","fb":"(M('1001')+M('1002')+M('1012'))-(MB('1001')+MB('1002')+MB('1012'))"},{"n":"加：期初现金余额","f":"(M('1001')+M('1002')+M('1012'))-((DR('1001')+DR('1002')+DR('1012'))-(CR('1001')+CR('1002')+CR('1012')))","fb":"MB('1001')+MB('1002')+MB('1012')"},{"n":"五、期末现金余额","isT":1,"f":"M('1001')+M('1002')+M('1012')","fb":"M('1001')+M('1002')+M('1012')"}]},"cf2":{"title":"现金流量表(指定法)","data":[{"n":"一、经营活动产生的现金流量","isH":1},{"n":"销售商品、提供劳务收到的现金","f":"CF('cf1')","fb":"CFY('cf1')"},{"n":"收到的税费返还","f":"CF('cf2')","fb":"CFY('cf2')"},{"n":"收到其他与经营有关的现金","f":"CF('cf3')","fb":"CFY('cf3')"},{"n":"经营活动现金流入小计","f":"CF('cf1')+CF('cf2')+CF('cf3')","fb":"CFY('cf1')+CFY('cf2')+CFY('cf3')","isT":1},{"n":"购买商品、接受劳务支付的现金","f":"CF('cf4')","fb":"CFY('cf4')"},{"n":"支付给职工以及为职工支付的现金","f":"CF('cf5')","fb":"CFY('cf5')"},{"n":"支付的各项税费","f":"CF('cf6')","fb":"CFY('cf6')"},{"n":"支付其他与经营有关的现金","f":"CF('cf7')","fb":"CFY('cf7')"},{"n":"经营活动现金流出小计","f":"CF('cf4')+CF('cf5')+CF('cf6')+CF('cf7')","fb":"CFY('cf4')+CFY('cf5')+CFY('cf6')+CFY('cf7')","isT":1},{"n":"经营活动产生的现金流量净额","f":"CF('cf1')+CF('cf2')+CF('cf3')-CF('cf4')-CF('cf5')-CF('cf6')-CF('cf7')","fb":"CFY('cf1')+CFY('cf2')+CFY('cf3')-CFY('cf4')-CFY('cf5')-CFY('cf6')-CFY('cf7')","isT":1},{"n":"二、投资活动产生的现金流量","isH":1},{"n":"收回投资收到的现金","f":"CF('cf8')","fb":"CFY('cf8')"},{"n":"取得投资收益收到的现金","f":"CF('cf9')","fb":"CFY('cf9')"},{"n":"处置固定资产无形资产收回的现金净额","f":"CF('cf10')","fb":"CFY('cf10')"},{"n":"投资活动现金流入小计","f":"CF('cf8')+CF('cf9')+CF('cf10')","fb":"CFY('cf8')+CFY('cf9')+CFY('cf10')","isT":1},{"n":"购建固定资产无形资产支付的现金","f":"CF('cf11')","fb":"CFY('cf11')"},{"n":"投资支付的现金","f":"CF('cf12')","fb":"CFY('cf12')"},{"n":"投资活动现金流出小计","f":"CF('cf11')+CF('cf12')","fb":"CFY('cf11')+CFY('cf12')","isT":1},{"n":"投资活动产生的现金流量净额","f":"CF('cf8')+CF('cf9')+CF('cf10')-CF('cf11')-CF('cf12')","fb":"CFY('cf8')+CFY('cf9')+CFY('cf10')-CFY('cf11')-CFY('cf12')","isT":1},{"n":"三、筹资活动产生的现金流量","isH":1},{"n":"吸收投资收到的现金","f":"CF('cf13')","fb":"CFY('cf13')"},{"n":"取得借款收到的现金","f":"CF('cf14')","fb":"CFY('cf14')"},{"n":"筹资活动现金流入小计","f":"CF('cf13')+CF('cf14')","fb":"CFY('cf13')+CFY('cf14')","isT":1},{"n":"偿还债务支付的现金","f":"CF('cf15')","fb":"CFY('cf15')"},{"n":"分配股利利润或偿付利息支付的现金","f":"CF('cf16')","fb":"CFY('cf16')"},{"n":"筹资活动现金流出小计","f":"CF('cf15')+CF('cf16')","fb":"CFY('cf15')+CFY('cf16')","isT":1},{"n":"筹资活动产生的现金流量净额","f":"CF('cf13')+CF('cf14')-CF('cf15')-CF('cf16')","fb":"CFY('cf13')+CFY('cf14')-CFY('cf15')-CFY('cf16')","isT":1},{"n":"四、现金及现金等价物净增加额","f":"CF('cf1')+CF('cf2')+CF('cf3')-CF('cf4')-CF('cf5')-CF('cf6')-CF('cf7')+CF('cf8')+CF('cf9')+CF('cf10')-CF('cf11')-CF('cf12')+CF('cf13')+CF('cf14')-CF('cf15')-CF('cf16')","fb":"CFY('cf1')+CFY('cf2')+CFY('cf3')-CFY('cf4')-CFY('cf5')-CFY('cf6')-CFY('cf7')+CFY('cf8')+CFY('cf9')+CFY('cf10')-CFY('cf11')-CFY('cf12')+CFY('cf13')+CFY('cf14')-CFY('cf15')-CFY('cf16')","isT":1},{"n":"加：期初现金余额","f":"(M('1001')+M('1002')+M('1012'))-((DR('1001')+DR('1002')+DR('1012'))-(CR('1001')+CR('1002')+CR('1012')))","fb":"MB('1001')+MB('1002')+MB('1012')"},{"n":"五、期末现金余额","isT":1,"f":"M('1001')+M('1002')+M('1012')","fb":"M('1001')+M('1002')+M('1012')"}]}};
+var DEFAULT_SYS_ACCS={"depDeb":"560212","depCre":"1602","salDeb":"560209","salCre":"2211","profit":"3103","profitPrefix":"5","incPrefix":"50,51,53","expPrefix":"54,56,57,58"};
+
+var TITLES={dashboard:'工作台','voucher-add':'填制凭证','voucher-list':'凭证管理','ledger-general':'总分类账','ledger-detail':'科目明细账','ledger-balance':'科目余额表','aux-summary':'辅助汇总表','aux-detail':'辅助明细表','init-bal':'期初余额录入',currency:'新增外币及汇率',auxiliary:'辅助核算项目',accounts:'会计科目体系',standard:'适用会计准则',closing:'期末处理与结账',storage:'本地自动配置',backup:'数据手动备份与恢复'};
+
+var DB=null, curBook=null, curPeriod='', isClosed=false, accs=[], auxItems=[], currencies=[], customStds=[];
+var curMenu='dashboard', dlgCb=null, voucherEntries=[], curVoucher=null, blData=[], dlData2=[], asData=[], adData=[];
+var editingVoucherId=null, syncDirHandle=null, syncPassword='', syncStatus='off', syncTimer=null, curImportMode='', pendingWrite=false;
+var blShowQtyState = false; 
+
+// ==========================================
+// 2. 通用底层 UI 工具
+// ==========================================
+window.ge = function(id){return document.getElementById(id);}
+window.qs = function(s){return document.querySelector(s);}
+window.qsa = function(s){return document.querySelectorAll(s);}
+window.show = function(id){window.ge(id)?.classList.remove('hidden');}
+window.hide = function(id){window.ge(id)?.classList.add('hidden');}
+window.fa = function(v){return (!v&&v!==0)?'0.00':isNaN(+v)?'0.00':(+v).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
+window.fq = function(v){return (!v&&v!==0)?'':isNaN(+v)?'':(+v).toFixed(4).replace(/\.?0+$/,'');}
+window.fmtV = function(amt,fc,fcN,qty,unit,hQ=false){let rs=amt?window.fa(amt):'0.00',ex=[];if(fcN&&fc)ex.push(`<span style="color:#7e22ce;">外: ${window.fa(fc)} ${fcN}</span>`);if(!hQ&&unit&&qty)ex.push(`<span style="color:#0ea5e9;">数: ${window.fq(qty)} ${window.esc(unit)}</span>`);if(ex.length)rs+=`<br><span class="text-xs" style="font-weight:normal;line-height:1.2;">[${ex.join(' | ')}]</span>`;return rs;}
+window.esc = function(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+
+// ==========================================
+// 2.1 全局美化 Alert/Confirm/Prompt 弹窗 (拦截系统原生弹窗)
+// ==========================================
+window.nativeAlert = window.alert;
+window.nativeConfirm = window.confirm;
+window.nativePrompt = window.prompt;
+
+window.alert = function(msg) {
+    let msgStr = String(msg);
+    let title = '系统提示', color = 'var(--primary)', icon = '💡';
+    
+    // 智能分析文本定级
+    if (msgStr.includes('拦截') || msgStr.includes('错误') || msgStr.includes('失败') || msgStr.includes('警告') || msgStr.includes('注意')) {
+        title = '系统拦截与警告'; color = 'var(--danger)'; icon = '⚠️';
+    } else if (msgStr.includes('成功') || msgStr.includes('🎉')) {
+        title = '操作成功'; color = 'var(--success)'; icon = '🎉';
+    }
+    
+    let html = `
+    <div class="overlay" id="sysAlert" style="z-index:999999; animation:fadeIn 0.2s ease;">
+        <div class="dlg" style="width:420px; padding:0; overflow:hidden; border-top:4px solid ${color}; box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);">
+            <div style="padding:24px;">
+                <div class="flex-row mb-3">
+                    <span style="font-size:22px; margin-right:6px;">${icon}</span>
+                    <span class="bold" style="font-size:16px; color:var(--text-main);">${title}</span>
+                </div>
+                <div class="color-m" style="margin-bottom:24px; white-space:pre-wrap; line-height:1.6; font-size:14px; max-height:50vh; overflow-y:auto; word-break:break-all;">${window.esc(msgStr)}</div>
+                <div style="text-align:right;">
+                    <button id="sysAlertBtn" onclick="document.getElementById('sysAlert').remove()" class="btn" style="background:${color}; color:#fff; padding:8px 24px; font-size:14px; border:none; border-radius:6px; cursor:pointer; outline:none; box-shadow:0 2px 4px rgba(0,0,0,0.1);">我知道了 (Enter)</button>
+                </div>
+            </div>
+        </div>
+    </div>`;
+    
+    let existing = document.getElementById('sysAlert');
+    if (existing) existing.remove();
+    document.body.insertAdjacentHTML('beforeend', html);
+    
+    let btn = document.getElementById('sysAlertBtn');
+    if (btn) {
+        setTimeout(() => btn.focus(), 10);
+        btn.addEventListener('keydown', function(e) {
+            if(e.key === 'Enter') { e.preventDefault(); document.getElementById('sysAlert').remove(); }
+        });
+    }
+};
+
+window.sysConfirm = function(msg) {
+    return new Promise(resolve => {
+        let html = `
+        <div class="overlay" id="sysConfirm" style="z-index:999998; animation:fadeIn 0.2s ease;">
+            <div class="dlg" style="width:400px; padding:0; overflow:hidden; border-top:4px solid var(--warning); box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);">
+                <div style="padding:24px;">
+                    <div class="flex-row mb-3">
+                        <span style="font-size:22px; margin-right:6px;">❓</span>
+                        <span class="bold" style="font-size:16px;">操作确认</span>
+                    </div>
+                    <div class="color-m" style="margin-bottom:24px; white-space:pre-wrap; line-height:1.6; font-size:14px;">${window.esc(msg)}</div>
+                    <div class="flex-row" style="justify-content:flex-end;">
+                        <button id="sysConfirmCancel" class="btn btn-n" style="margin-right:12px; padding:8px 16px;">取消 (Esc)</button>
+                        <button id="sysConfirmOk" class="btn btn-w" style="padding:8px 24px;">确 定 (Enter)</button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+        let existing = document.getElementById('sysConfirm');
+        if (existing) existing.remove();
+        document.body.insertAdjacentHTML('beforeend', html);
+        
+        let box = document.getElementById('sysConfirm');
+        let btnOk = document.getElementById('sysConfirmOk');
+        let btnCancel = document.getElementById('sysConfirmCancel');
+        
+        const cleanup = () => box.remove();
+        
+        btnOk.onclick = () => { cleanup(); resolve(true); };
+        btnCancel.onclick = () => { cleanup(); resolve(false); };
+        
+        setTimeout(() => btnOk.focus(), 10);
+        
+        box.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { cleanup(); resolve(false); }
+            if (e.key === 'Enter' && e.target !== btnCancel) { e.preventDefault(); cleanup(); resolve(true); }
+        });
+    });
+};
+
+window.sysPrompt = function(msg, defaultVal = '') {
+    return new Promise(resolve => {
+        let html = `
+        <div class="overlay" id="sysPrompt" style="z-index:999998; animation:fadeIn 0.2s ease;">
+            <div class="dlg" style="width:400px; padding:0; overflow:hidden; border-top:4px solid var(--info); box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);">
+                <div style="padding:24px;">
+                    <div class="flex-row mb-3">
+                        <span style="font-size:22px; margin-right:6px;">✏️</span>
+                        <span class="bold" style="font-size:16px;">系统输入框</span>
+                    </div>
+                    <div class="color-m" style="margin-bottom:12px; font-size:14px;">${window.esc(msg)}</div>
+                    <input type="text" id="sysPromptInp" class="inp mb-4" value="${window.esc(defaultVal)}" style="font-size:14px; padding:10px;">
+                    <div class="flex-row" style="justify-content:flex-end;">
+                        <button id="sysPromptCancel" class="btn btn-n" style="margin-right:12px; padding:8px 16px;">取消 (Esc)</button>
+                        <button id="sysPromptOk" class="btn btn-i" style="padding:8px 24px;">确 定 (Enter)</button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+        let existing = document.getElementById('sysPrompt');
+        if (existing) existing.remove();
+        document.body.insertAdjacentHTML('beforeend', html);
+        
+        let box = document.getElementById('sysPrompt');
+        let inp = document.getElementById('sysPromptInp');
+        let btnOk = document.getElementById('sysPromptOk');
+        let btnCancel = document.getElementById('sysPromptCancel');
+        
+        const cleanup = () => box.remove();
+        
+        btnOk.onclick = () => { cleanup(); resolve(inp.value); };
+        btnCancel.onclick = () => { cleanup(); resolve(null); };
+        
+        setTimeout(() => { inp.focus(); inp.select(); }, 10);
+        
+        box.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { cleanup(); resolve(null); }
+            if (e.key === 'Enter') { e.preventDefault(); cleanup(); resolve(inp.value); }
+        });
+    });
+};
+
+window.prevP = function(p){let[y,m]=p.split('-');m=+m;return m===1?(y-1)+'-12':y+'-'+String(m-1).padStart(2,'0');}
+window.nextP = function(p){let[y,m]=p.split('-');m=+m;return m===12?(+y+1)+'-01':y+'-'+String(m+1).padStart(2,'0');}
+window.isLeafAcc = function(c){return !accs.some(a=>a.code!==c&&a.code.startsWith(c));}
+window.getAccPath = function(c){return accs.filter(a=>c.startsWith(a.code)).sort((a,b)=>a.code.length-b.code.length).map(a=>a.name).join('-');}
+window.getAccName = function(id){let a=accs.find(x=>x.id==id);return a?a.code+' '+window.getAccPath(a.code):'';}
+window.getAuxName = function(id){let x=auxItems.find(a=>a.id==id);return x?x.name:'';}
+window.isCashAcc = function(c){return ['1001', '1002', '1012'].some(prefix => c.startsWith(prefix));}
+window.getCFName = function(code){let x=CF_ITEMS.find(c=>c.code===code);return x?x.name:'';}
+
+// 增强：检查科目是否已有业务数据（凭证）
+window.checkAccHasData = async function(accId) {
+    if (!accId) return false;
+    let es = await window.dbIdx('entries', 'accId', accId);
+    if (es && es.length > 0) return true;
+    let a = accs.find(x => x.id == accId);
+    if (a && (a.initBal != 0 || a.initFcBal != 0 || a.initQty != 0)) return true;
+    return false;
+};
+
+// 增强：获取科目完整层级名称 (例如: 管理费用-办公费)
+window.getFullAccName = function(code) {
+    let parts = [];
+    for (let i = 4; i <= code.length; i += 2) {
+        let c = code.substring(0, i);
+        let a = accs.find(x => x.code === c);
+        if (a) parts.push(a.name);
+    }
+    return parts.join('-');
+};
+
+window.toggleSidebar = function(){window.ge('sidebarEl').classList.toggle('collapsed');}
+window.openDlg = function(t,h,c){window.ge('dlgTitle').textContent=t;window.ge('dlgBody').innerHTML=h;dlgCb=c;window.show('dlgOverlay');}
+window.closeDlg = function(){window.hide('dlgOverlay');dlgCb=null;}
+window.confirmDlg = function(){if(dlgCb)dlgCb();}
+
+window.addEventListener('keydown', e => {
+  if(e.key === 'Escape') { window.closeDlg(); window.hide('vDlgOverlay'); }
+  if((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S' || e.key === 'Enter')) { 
+      // 避免干扰到 sysAlert / sysConfirm 的回车
+      if (e.key === 'Enter' && (!e.ctrlKey && !e.metaKey)) return;
+      e.preventDefault(); 
+      if(curMenu === 'voucher-add' && typeof window.saveVoucher === 'function') window.saveVoucher(); 
+      else if(dlgCb && !window.ge('dlgOverlay').classList.contains('hidden')) window.confirmDlg();
+      else if(curMenu === 'init-bal' && typeof window.saveInitBal === 'function') window.saveInitBal();
+  }
+});
+window.addEventListener('beforeunload',e=>{if(pendingWrite){e.preventDefault();e.returnValue='数据备份中，离开可能丢失更改';}});
+setInterval(()=>{const e=window.ge('topClock');if(e)e.textContent=new Date().toLocaleString();},1000);
+
+// ==========================================
+// 3. 凭证预览与通用打印
+// ==========================================
+window.printCurrentView = function() {
+    window.ge('printArea').innerHTML=window.ge('pageEl').innerHTML;
+    document.body.classList.add('printing'); window.print();
+    setTimeout(()=>{document.body.classList.remove('printing');window.ge('printArea').innerHTML='';},500);
+};
+window.navToDetail = function(code,p,auxId) {
+  let a=accs.find(x=>x.code===code);if(!a){alert('未找到科目');return;} window.goMenu('ledger-detail');
+  setTimeout(()=>{if(window.ge('dlP'))window.ge('dlP').value=p;if(window.ge('dlAcc'))window.ge('dlAcc').value=a.id;if(window.ge('dlAux')&&auxId&&auxId!=='undefined')window.ge('dlAux').value=auxId;if(typeof window.calcDetail==='function')window.calcDetail();},100);
+};
+window.viewVoucher = async function(id){
+    curVoucher=await window.dbGet('vouchers',id);if(!curVoucher)return;
+    window.ge('vDlgTitle').textContent='凭证详情 - '+curVoucher.vno;
+    window.ge('vDlgInfo').innerHTML=`<div>日期: <b>${window.esc(curVoucher.date)}</b></div><div>字号: <b class="color-p">${window.esc(curVoucher.vno)}</b></div><div>附件: <b>${curVoucher.attach||0}</b> 张</div><div>状态: <b class="${curVoucher.status==='已审核'?'color-s':'color-w'}">${curVoucher.status}</b></div><button class="btn btn-n text-xs ml-auto" onclick="window.printVoucher(${id})">🖨️ 打印凭证</button>`;
+    let es=await window.dbIdx('entries','voucherId',id);
+    window.ge('vDlgBody').innerHTML=es.map(e=>{let a=accs.find(x=>x.id==e.accId);return`<tr><td>${window.esc(e.summary)}</td><td class="bold color-p" title="${window.esc(window.getAccName(e.accId))}">${window.esc(window.getAccName(e.accId))}</td><td class="tc" style="line-height:1.8;">${e.auxId?`<span class="badge gray">${window.esc(window.getAuxName(e.auxId))}</span>`:''}${e.cfItem?`<br><span class="badge green">流向: ${window.esc(window.getCFName(e.cfItem))}</span>`:''}</td><td class="tr text-xs color-m" style="line-height:1.2;">${window.fmtV(0,e.fcAmount,e.currency,e.qty,a?a.unit:'').replace('0.00<br>','')}</td><td class="tr dr-val">${e.deb?window.fa(e.deb):''}</td><td class="tr cr-val">${e.cre?window.fa(e.cre):''}</td></tr>`;}).join('')+`<tr class="highlight"><td colspan="4" class="tr">总计：</td><td class="tr dr-val">${window.fa(curVoucher.totalDeb)}</td><td class="tr cr-val">${window.fa(curVoucher.totalCre)}</td></tr>`;
+    window.show('vDlgOverlay');
+};
+window.closeVDlg = function(){window.hide('vDlgOverlay');};
+window.exportVoucherSingle = function(){if(typeof window.exportTableEl === 'function') window.exportTableEl(window.ge('vDlgTbl'),'凭证_'+(curVoucher?.vno||''));};
+window.printVoucher = async function(id){
+    let v=await window.dbGet('vouchers',id),es=await window.dbIdx('entries','voucherId',id);if(!v)return;
+    let h=`<div style="text-align:center;font-size:20px;font-weight:bold;margin-bottom:15px;letter-spacing:4px">记 账 凭 证</div><div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:12px;font-weight:600"><span>单位：${window.esc(curBook.name)}</span><span>日期：${window.esc(v.date)}</span><span>字号：${window.esc(v.vno)}</span><span>单据：${v.attach||0} 张</span></div><table class="ptbl"><thead><tr><th>摘 要</th><th>会计科目</th><th>辅助/现金流/参数</th><th>借方金额</th><th>贷方金额</th></tr></thead><tbody>`;
+    es.forEach(e=>{let a=accs.find(x=>x.id==e.accId), xt=[];if(e.auxId)xt.push(`辅: ${window.esc(window.getAuxName(e.auxId))}`);if(e.cfItem)xt.push(`流: ${window.esc(window.getCFName(e.cfItem))}`);if(a&&a.isQty&&e.qty)xt.push(`[量: ${window.fq(e.qty)}${window.esc(a.unit)} @ ${window.fq(e.price)}]`);if(e.currency)xt.push(`[外: ${e.currency} ${window.fa(e.fcAmount)} @ ${e.excRate}]`);h+=`<tr><td>${window.esc(e.summary)}</td><td>${window.esc(window.getAccName(e.accId))}</td><td style="text-align:left;font-size:11px;">${xt.join('<br>')}</td><td style="text-align:right;font-family:Consolas">${e.deb?window.fa(e.deb):''}</td><td style="text-align:right;font-family:Consolas">${e.cre?window.fa(e.cre):''}</td></tr>`;});
+    while(es.length<4){h+='<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>';es.push({});}
+    h+=`<tr><td colspan="3" style="text-align:right;font-weight:bold;">合 计：</td><td style="text-align:right;font-weight:bold;font-family:Consolas">${window.fa(v.totalDeb)}</td><td style="text-align:right;font-weight:bold;font-family:Consolas">${window.fa(v.totalCre)}</td></tr></tbody></table>`;
+    window.ge('printArea').innerHTML=h;document.body.classList.add('printing');window.print();setTimeout(()=>document.body.classList.remove('printing'),500);
+};
+
+// ==========================================
+// 4. IndexedDB 底层存储引擎 
+// ==========================================
+window.xorEnc = function(s,k){if(!k)return s;let r='';for(let i=0;i<s.length;i++)r+=String.fromCharCode(s.charCodeAt(i)^(k.charCodeAt(i%k.length)&255));return r;}
+window.buildFdbContent = function(o,p){return btoa(p?window.xorEnc(unescape(encodeURIComponent(JSON.stringify(o))),p):unescape(encodeURIComponent(JSON.stringify(o))));}
+window.parseFdbContent = function(t,p){let s=t.trim(),m=s.match(new RegExp('<script[^>]*>([\\s\\S]*?)<\\/script>','i'));if(m)s=m[1].trim();try{let b=atob(s);if(p)b=window.xorEnc(b,p);return JSON.parse(decodeURIComponent(escape(b)));}catch(e){try{return JSON.parse(p?window.xorEnc(s,p):s);}catch(e2){throw new Error("解密验证失败");}}}
+window.migrateReportsFormat = function(ro){try{if(!ro||typeof ro!=='object')return JSON.parse(JSON.stringify(DEFAULT_REPORTS));let ks=Object.keys(ro);if(!ks.length)return JSON.parse(JSON.stringify(DEFAULT_REPORTS));if(Array.isArray(ro[ks[0]])){let nr={};for(let k in ro)nr[k]={title:k==='bs'?'资产负债表':k==='is'?'利润表':k==='cf'?'现金流量表':'自定义表',data:ro[k]||[]};return nr;}return ro;}catch(e){return JSON.parse(JSON.stringify(DEFAULT_REPORTS));}}
+
+window.openDB = function(){
+    return new Promise((rs,rj)=>{
+        if (!window.indexedDB) { return rj(new Error("浏览器不支持 IndexedDB！")); }
+        try {
+            let rq = indexedDB.open('FOS8', 16);
+            rq.onupgradeneeded = e => {
+                let d = e.target.result, tx = e.target.transaction, cs = (n,idx) => {
+                    let s = !d.objectStoreNames.contains(n) ? d.createObjectStore(n, {keyPath:'id', autoIncrement:true}) : tx.objectStore(n);
+                    if(idx) idx.forEach(i => { if(!s.indexNames.contains(i)) s.createIndex(i, i, {unique:false}); }); return s;
+                };
+                cs('books',[]); cs('standards',[]); if(!d.objectStoreNames.contains('sys_config')) d.createObjectStore('sys_config',{keyPath:'id'});
+                cs('subjects',['bookId']); cs('closings',['bookId']); cs('auxItems',['bookId']); cs('currencies',['bookId']); cs('vouchers',['bookId','period']); cs('entries',['bookId','voucherId','accId']);
+            };
+            rq.onsuccess = e => { DB = e.target.result; rs(DB); };
+            rq.onerror = e => rj(e.target.error || new Error("被系统拒绝，一般是由于使用了 file:/// 或处于无痕模式"));
+        } catch(err) { rj(err); }
+    });
+};
+
+window.dbOp = function(m,s,d,i){
+    return new Promise((rs,rj)=>{
+        if(!DB) return rj(new Error("尚未连接到数据库引擎"));
+        try {
+            let st = DB.transaction(s, ['add','put','delete','clear'].includes(m) ? 'readwrite' : 'readonly').objectStore(s);
+            let r = m === 'idx' ? st.index(d).getAll(i) : (m === 'getAll' ? st.getAll() : st[m](d));
+            r.onsuccess = () => { if(['add','put','delete','clear'].includes(m) && s !== 'sys_config' && typeof window.triggerAutoSync==='function') window.triggerAutoSync(); rs(r.result); };
+            r.onerror = () => rj(r.error || new Error("事务异常回滚"));
+        } catch (err) { rj(err); }
+    });
+};
+window.dbAll = function(s){ return window.dbOp('getAll',s); };
+window.dbIdx = function(s,idx,val){ return window.dbOp('idx',s,idx,val); };
+window.dbGet = function(s,id){ return window.dbOp('get',s,id); };
+window.dbAdd = function(s,d){ return window.dbOp('add',s,d); };
+window.dbPut = function(s,d){ return window.dbOp('put',s,d); };
+window.dbDel = function(s,id){ return window.dbOp('delete',s,id); };
+
+window.getFullDataJSON = async function(){let ts=['books','subjects','vouchers','entries','closings','auxItems','standards','currencies'],d={backupType:'full'};for(let i of ts)d[i]=await window.dbAll(i);return d;};
+window.getSingleBookDataJSON = async function(bid){let ts=['subjects','vouchers','entries','closings','auxItems','currencies'],d={backupType:'single',books:[(await window.dbAll('books')).find(b=>b.id===bid)]};for(let i of ts)d[i]=await window.dbIdx(i,'bookId',bid);return d;};
+
+window.calcTAcc = async function(p,occ,sp,st){
+    let m={}, av=await window.dbIdx('vouchers','bookId',curBook.id); if(st)av=av.filter(v=>v.status===st);
+    let fv=occ?av.filter(v=>v.period>=sp&&v.period<=p):av.filter(v=>v.period<=p), vs=new Set(fv.map(v=>v.id));
+    accs.forEach(a=>m[a.id]={...a,deb:0,cre:0,bal:0,fcDeb:0,fcCre:0,fcBal:0,qD:0,qC:0,qBal:0});
+    (await window.dbIdx('entries','bookId',curBook.id)).forEach(e=>{
+        if(vs.has(e.voucherId)&&m[e.accId]){
+            let x=m[e.accId]; x.deb+=+e.deb||0; x.cre+=+e.cre||0;
+            if(e.currency){if(+e.deb>0)x.fcDeb+=+e.fcAmount||0;if(+e.cre>0)x.fcCre+=+e.fcAmount||0;}
+            if(x.isQty){if(+e.deb>0)x.qD+=+e.qty||0;if(+e.cre>0)x.qC+=+e.qty||0;}
+        }
+    });
+    for(let k in m){
+        let x=m[k],ib=occ?0:x.initBal||0,ifc=occ?0:x.initFcBal||0,iq=occ?0:x.initQty||0;
+        x.bal=ib+(x.direction==='借'?x.deb-x.cre:x.cre-x.deb);
+        x.fcBal=ifc+(x.direction==='借'?x.fcDeb-x.fcCre:x.fcCre-x.fcDeb);
+        x.qBal=iq+(x.direction==='借'?x.qD-x.qC:x.qC-x.qD);
+    }
+    return m;
+};
+
+// ==========================================
+// 5. 自动本地容灾备份接口
+// ==========================================
+window.verifyFSPermission = async function(h,wp){if(!h)return!1;try{let o={mode:'readwrite'};if(await h.queryPermission(o)==='granted')return!0;if(wp&&await h.requestPermission(o)==='granted')return!0;return!1;}catch(e){return!1;}};
+window.setSyncUI = function(s,f){syncStatus=s;let b=window.ge('topSyncBtn'),i=window.ge('tsIcon'),t=window.ge('tsText');if(!b)return;b.className='badge '+(s==='off'?'gray':s==='ok'||s==='syncing'?'green':s==='warn'?'orange':'red');i.textContent=s==='off'?'⚫':s==='warn'?'🟡':s==='err'?'🔴':s==='syncing'?'🔄':'🟢';t.textContent=s==='off'?'未开启自动容灾':s==='warn'?'需重新授权':s==='err'?'写入失败':s==='syncing'?'同步快照中...':(f?'已连接容灾: '+f:'正常');if(curMenu==='storage'&&typeof window.updateStoragePageSyncUI==='function')window.updateStoragePageSyncUI();};
+window.initAutoSync = async function(){try{let c=await window.dbGet('sys_config','sync_setting');if(c&&c.handle){syncDirHandle=c.handle;syncPassword=c.pwd||'';window.setSyncUI(await window.verifyFSPermission(syncDirHandle,!1)?'ok':'warn',syncDirHandle.name);}else window.setSyncUI('off');}catch(e){}};
+window.triggerAutoSync = function(){if(syncDirHandle){window.setSyncUI('syncing');pendingWrite=!0;clearTimeout(syncTimer);syncTimer=setTimeout(window.performAutoSync,1000);}};
+window.performAutoSync = async function(){
+    if(!syncDirHandle){pendingWrite=!1;return;}
+    try{
+        if(!await window.verifyFSPermission(syncDirHandle,!1)){window.setSyncUI('warn',syncDirHandle.name);pendingWrite=!1;return;}
+        let eF=window.buildFdbContent(await window.getFullDataJSON(),syncPassword),fF=await syncDirHandle.getFileHandle('FinanceOS_全局容灾备份快照.fdb',{create:!0}),wF=await fF.createWritable();
+        await wF.write(eF);await wF.close();
+        if(curBook){
+            let eS=window.buildFdbContent(await window.getSingleBookDataJSON(curBook.id),syncPassword),nStr=String(curBook.name).replace(/[\\/:*?"<>|]/g,'_'),fS=await syncDirHandle.getFileHandle(`FinanceOS_账套快照_${nStr}.fdb`,{create:!0}),wS=await fS.createWritable();
+            await wS.write(eS);await wS.close();
+        }
+        window.setSyncUI('ok',syncDirHandle.name);
+    }catch(e){ window.setSyncUI('err'); }finally{ pendingWrite=!1; }
+};
+window.handleSyncStatusClick = async function(){if(!window.showDirectoryPicker){alert("您的浏览器不支持直连文件夹容灾技术，请定期手动备份数据！");return;}if(syncStatus==='warn'){if(await window.verifyFSPermission(syncDirHandle,!0)){window.setSyncUI('ok',syncDirHandle.name);window.triggerAutoSync();alert("权限恢复成功，自动容灾已连接。");}}else window.goMenu('storage');};
+window.bindSyncDir = async function(){if(!window.showDirectoryPicker){alert('不支持直连备份');return;}try{syncDirHandle=await window.showDirectoryPicker();syncPassword=window.ge('syncPwdInp')?window.ge('syncPwdInp').value:'';await window.dbPut('sys_config',{id:'sync_setting',handle:syncDirHandle,pwd:syncPassword});window.setSyncUI('ok',syncDirHandle.name);window.triggerAutoSync();alert('连接成功！');if(typeof window.updateStoragePageSyncUI==='function')window.updateStoragePageSyncUI();}catch(e){console.log(e);}};
+window.unbindSyncDir = async function(){if(!syncDirHandle||!await window.sysConfirm('确认切断容灾连接？'))return;await window.dbPut('sys_config',{id:'sync_setting',handle:null,pwd:''});syncDirHandle=null;syncPassword='';window.setSyncUI('off');if(typeof window.updateStoragePageSyncUI==='function')window.updateStoragePageSyncUI();};
+window.saveSyncConfig = async function(){syncPassword=window.ge('syncPwdInp')?window.ge('syncPwdInp').value:'';if(syncDirHandle){await window.dbPut('sys_config',{id:'sync_setting',handle:syncDirHandle,pwd:syncPassword});alert('加密策略已保存。');}else alert('请先选择绑定的容灾文件夹。');};
+
+// ==========================================
+// 6. SPA 动态加载与核心调度路由
+// ==========================================
+const MODULE_MAP = {
+  'dashboard': 'module_daily.html', 'voucher-add': 'module_daily.html', 'voucher-list': 'module_daily.html',
+  'ledger-general': 'module_ledger.html', 'ledger-detail': 'module_ledger.html', 'ledger-balance': 'module_ledger.html', 'aux-summary': 'module_ledger.html', 'aux-detail': 'module_ledger.html',
+  'init-bal': 'module_settings.html', 'currency': 'module_settings.html', 'auxiliary': 'module_settings.html', 'accounts': 'module_settings.html', 'standard': 'module_settings.html', 'closing': 'module_settings.html', 'storage': 'module_settings.html', 'backup': 'module_settings.html'
+};
+
+const loadedModules = new Set();
+
+window.loadModule = async function(moduleName) {
+    if (loadedModules.has(moduleName)) return;
+    try {
+        const res = await fetch(moduleName);
+        if (!res.ok) throw new Error('HTTP 状态码异常 ' + res.status);
+        const html = await res.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const scripts = doc.querySelectorAll('script');
+        for (let s of scripts) {
+            const newScript = document.createElement('script');
+            newScript.textContent = s.textContent;
+            document.body.appendChild(newScript);
+        }
+        loadedModules.add(moduleName);
+    } catch (e) {
+        throw new Error(`无法跨域拉取子模块 [${moduleName}]！\n现代浏览器安全策略禁止通过 file:/// 协议直接加载其他本地文件。\n\n解决办法：\n1. 使用 Live Server 插件运行\n2. 或将文件部署到免费的云端环境\n3. [终极手动办法] 将 module_ 开头的 HTML 文件里的代码手动复制到 index.html 底部`);
+    }
+};
+
+window.buildMenu = function(){
+  const ms=[{g:'日常处理',i:[{k:'dashboard',l:'📊 工作台'},{k:'voucher-add',l:'✏️ 填制凭证'},{k:'voucher-list',l:'📋 凭证管理'}]},{g:'账簿查询',i:[{k:'ledger-general',l:'📖 总分类账'},{k:'ledger-balance',l:'⚖️ 科目余额表'},{k:'ledger-detail',l:'📒 科目明细账'},{k:'aux-summary',l:'🏷️ 辅助汇总表'},{k:'aux-detail',l:'🔍 辅助明细表'}]},{g:'财务报表',i:[]},{g:'基础设置',i:[{k:'init-bal',l:'💰 期初余额'},{k:'currency',l:'💱 外币与汇率'},{k:'auxiliary',l:'🏷️ 辅助核算'},{k:'accounts',l:'⚙️ 会计科目'},{k:'standard',l:'📚 会计准则'},{k:'closing',l:'🔒 期末结账'}]},{g:'系统管理',i:[{k:'storage',l:'💾 本地自动备份'},{k:'backup',l:'🗄️ 数据手动备份与恢复'}]}];
+  if(curBook&&curBook.reports)for(let k in curBook.reports){let r=curBook.reports[k];if(r&&r.title){ms[2].i.push({k:'report-'+k,l:'📄 '+window.esc(r.title)});TITLES['report-'+k]=r.title;}}
+  window.ge('menuEl').innerHTML=ms.map(g=>`<div class="menu-group">${window.esc(g.g)}</div>`+g.i.map(it=>`<div class="menu-item ${curMenu===it.k?'active':''}" onclick="window.goMenu('${it.k}')">${it.l}</div>`).join('')).join('');
+};
+
+window.buildTopBtns = function(k){
+  let h=''; if(['init-bal','auxiliary'].includes(k))h+=`<button onclick="window.triggerImport('${k}')" class="btn btn-n mr-2">📥 导入数据</button>`;
+  if(['init-bal','currency','auxiliary','accounts'].includes(k))h+=`<button onclick="window.exportCurTable()" class="btn btn-i">📤 导出列表</button>`;
+  if(k.startsWith('report-')){
+      let r=k.substring(7);
+      h+=`<button onclick="if(window.exportCustomReport)window.exportCustomReport('${r}')" class="btn btn-i mr-2">📤 导出报表(Excel)</button>
+          <button onclick="if(window.editReportFormulas)window.editReportFormulas('${r}')" class="btn btn-p mr-2">⚙️ 公式配置</button>
+          <button onclick="if(window.createNewReport)window.createNewReport()" class="btn btn-n mr-2">➕ 新增</button>
+          <button onclick="if(window.deleteReport)window.deleteReport('${r}')" class="btn btn-text danger">🗑️ 删除</button>`;
+  }
+  if(k==='voucher-list')h+=`<button onclick="window.ge('importVFile').click()" class="btn btn-n mr-2">📥 导入凭证</button>
+      <input type="file" id="importVFile" accept=".csv" class="hidden" onchange="if(window.importVouchersCSV)window.importVouchersCSV(this)">
+      <button onclick="if(window.exportVoucherDetail)window.exportVoucherDetail()" class="btn btn-i ml-2">导出明细(Excel)</button>
+      <button onclick="window.printCurrentView()" class="btn btn-n ml-2">🖨️ 打印列表</button>`;
+  if(k==='ledger-general')h+=`<button onclick="if(window.exportLedgerGeneral)window.exportLedgerGeneral()" class="btn btn-i">导出总账(Excel)</button>`;
+  if(k==='ledger-balance')h+=`<button onclick="if(window.exportBlData)window.exportBlData()" class="btn btn-i">导出余额表(Excel)</button>`; 
+  if(k==='ledger-detail')h+=`<button onclick="if(window.exportDlData)window.exportDlData()" class="btn btn-i">导出明细账(Excel)</button>`;
+  if(k==='aux-summary')h+=`<button onclick="if(window.exportAuxSummary)window.exportAuxSummary()" class="btn btn-i">导出汇总表</button>`; 
+  if(k==='aux-detail')h+=`<button onclick="if(window.exportAuxDetail)window.exportAuxDetail()" class="btn btn-i">导出明细账</button>`;
+  if(k.startsWith('report-')||['ledger-general','ledger-detail','ledger-balance','aux-summary','aux-detail'].includes(k))h+=`<button onclick="window.printCurrentView()" class="btn btn-n" style="margin-left:8px;">🖨️ 打印</button>`;
+  window.ge('topBtns').innerHTML=h;
+};
+
+window.goMenu = async function(k,kp){
+  curMenu=k; if(k==='voucher-add'&&!kp)editingVoucherId=null; window.buildMenu();window.ge('pageTitle').textContent=TITLES[k]||k;window.buildTopBtns(k);
+  try {
+      window.ge('pageEl').innerHTML='<div class="tc py-4 color-m" style="padding-top:40px;">🚀 组件引擎热加载中，请稍候...</div>';
+      let moduleName = k.startsWith('report-') ? 'module_report.html' : MODULE_MAP[k];
+      if (moduleName) await window.loadModule(moduleName);
+
+      let fnName = {
+          'dashboard': 'pgDashboard', 'voucher-add': 'pgVoucherAdd', 'voucher-list': 'pgVoucherList',
+          'ledger-general': 'pgLedgerGeneral', 'ledger-detail': 'pgLedgerDetail', 'ledger-balance': 'pgLedgerBalance', 'aux-summary': 'pgAuxSummary', 'aux-detail': 'pgAuxDetail',
+          'init-bal': 'pgInitBal', 'currency': 'pgCurrency', 'auxiliary': 'pgAuxiliary', 'accounts': 'pgAccounts', 'standard': 'pgStandard', 'closing': 'pgClosing', 'storage': 'pgStorage', 'backup': 'pgBackup'
+      }[k];
+      
+      if (k.startsWith('report-')) {
+          if (typeof window.pgDynamicReport === 'function') await window.pgDynamicReport(k.substring(7));
+      } else if (fnName && typeof window[fnName] === 'function') {
+          await window[fnName]();
+      } else {
+          window.ge('pageEl').innerHTML=`<div class="alert alert-warn mt-3">❌ 致命渲染错误：无法执行 [${fnName}]，该模块文件可能未被部署到服务器。</div>`;
+      }
+  } catch(e) {
+      window.ge('pageEl').innerHTML=`<div class="alert alert-warn mt-3" style="white-space: pre-wrap; font-size:14px; line-height:1.6;">❌ 模块拉取遭遇拦截:\n${window.esc(e.message)}</div>`;
+  }
+};
+
+// ==========================================
+// 7. 大厅账套生命周期管理
+// ==========================================
+window.loadBootPage = async function(){
+    try {
+        if(typeof window.initAutoSync === 'function') await window.initAutoSync();
+        customStds=await window.dbAll('standards');
+        let bs=await window.dbAll('books'),sel=window.ge('inStd');
+        while(sel.options.length>1)sel.remove(1);
+        customStds.forEach(s=>sel.add(new Option(window.esc(s.name),s.id)));
+        window.ge('bookListEl').innerHTML=bs.length?bs.map(b=>`<div class="bitem" onclick="window.enterBook(${b.id})"><div class="f1"><div class="bold color-p" style="font-size:15px;">${window.esc(b.name)}</div><div class="text-xs color-m mt-3 flex-row"><span>期间：<b class="mono" style="color:#10b981;">${window.esc(b.currentPeriod)}</b></span><span>| 准则：${window.esc(b.standardName||'默认')}</span></div></div><button onclick="window.delBookUI(${b.id},event)" class="btn btn-d text-xs">删除</button></div>`).join(''):'<div class="tc py-4 color-m" style="border:2px dashed var(--border);border-radius:8px;margin-top:10px;">暂无账套数据，请先创建</div>';
+    } catch(e) {
+        window.ge('bookListEl').innerHTML = `<div class="tc py-4" style="color:#ef4444;border:2px dashed #ef4444;border-radius:8px;padding:20px;">读取失败：数据库拒绝连接</div>`;
+    }
+};
+
+window.delBookUI = async function(id,e){
+    e.stopPropagation();
+    try {
+        let b=await window.dbGet('books',id);
+        if(!b) return;
+        if(!await window.sysConfirm(`确定要彻底删除账套【${b.name}】吗？数据不可恢复！`)) return;
+        let c=await window.sysPrompt(`请输入【${b.name}】确认：`);
+        if(c===b.name){
+            for(let t of ['subjects','vouchers','entries','closings','auxItems','currencies']){let rs=await window.dbIdx(t,'bookId',id);for(let r of rs)await window.dbDel(t,r.id);}
+            await window.dbDel('books',id);
+            if(curBook&&curBook.id===id)curBook=null;
+            window.triggerAutoSync();
+            window.loadBootPage();
+        }else if(c!==null) alert('输入不匹配，删除已取消。');
+    } catch(err) { alert("操作失败：" + err.message); }
+};
+
+window.createBook = async function(){
+    try {
+        if(!DB) throw new Error("数据库连接未就绪或被浏览器阻断！");
+        
+        let n=window.ge('inName').value.trim();
+        let pRaw=window.ge('inPeriod').value; 
+        let sid=window.ge('inStd').value;
+        
+        // 强大的日期格式清洗
+        let p = pRaw;
+        if (pRaw && !/^\d{4}-\d{2}$/.test(pRaw)) {
+            let matches = pRaw.match(/\d+/g);
+            if (matches && matches.length >= 2) {
+                p = matches[0] + '-' + matches[1].padStart(2, '0');
+            } else {
+                return alert('【拦截】日期格式无法解析，请确保格式如：2026-04');
             }
-            empty.classList.remove('active');
+        }
+        
+        if(!n||!p) return alert('【提示】企业名称与启用月份必须填写！');
+        
+        // 【核心修改】：应用您提供的最新重分类版本为默认规则
+        let ac=STD_ACCS, sn='小企业会计准则(重分类完整版)', rp=JSON.parse(JSON.stringify(DEFAULT_REPORTS)), sy=JSON.parse(JSON.stringify(DEFAULT_SYS_ACCS));
+        if(sid){
+            let s=customStds.find(x=>x.id==sid);
+            if(s){
+                if(s.accounts)ac=s.accounts; sn=s.name;
+                if(s.reports)rp=window.migrateReportsFormat(s.reports);
+                if(s.sysAccs)sy=JSON.parse(JSON.stringify(s.sysAccs));
+            }
+        }
+        
+        let bid=await window.dbAdd('books',{name:n,currentPeriod:p,standardId:sid||null,standardName:sn,reports:rp,sysAccs:sy});
+        for(let a of ac) await window.dbAdd('subjects',{...a,initBal:a.initBal||0,initFcBal:a.initFcBal||0,initQty:a.initQty||0,isQty:a.isQty||0,unit:a.unit||'',currency:a.currency||'',bookId:bid});
+        
+        alert('🎉 建账初始化圆满成功！系统将应用【' + sn + '】为您载入账簿...');
+        window.ge('inName').value=''; window.ge('inPeriod').value='';
+        await window.enterBook(bid,'init-bal');
+        
+    } catch(e) {
+        alert('❌ 建账操作引发异常：\n' + e.message + '\n\n【常见原因】您可能正处于双击运行(file://)环境或处于隐私窗口下，本地数据库权限被拦截。');
+    }
+};
 
-            list.forEach(tool => {
-                const card = document.createElement('div');
-                card.className = `tool-card ${tool.status === 'dev' ? 'disabled' : ''}`;
-                
-                const linkHtml = tool.status === 'ok' 
-                    ? `<a href="${tool.link}" class="tool-link">立即使用 <span class="arrow">→</span></a>`
-                    : `<span class="tool-link">敬请期待</span>`;
-
-                card.innerHTML = `
-                    <div class="tool-icon">${tool.icon}</div>
-                    <h3 class="tool-title">${highlight(tool.title, term)}</h3>
-                    <p class="tool-desc">${highlight(tool.desc, term)}</p>
-                    ${linkHtml}
-                `;
-
-                if (tool.status === 'ok') {
-                    card.onclick = (e) => { if (!e.target.closest('a')) location.href = tool.link; };
+window.enterBook = async function(id,tg){
+    try{
+        let b=await window.dbGet('books',id);
+        if(!b) return alert('数据断层：未找到对应的账套数据');
+        
+        curBook=b; curPeriod=b.currentPeriod;
+        let nr=window.migrateReportsFormat(b.reports),c=false;
+        if(JSON.stringify(nr)!==JSON.stringify(b.reports)){b.reports=nr;c=true;}
+        
+        // 【热修复】自动为存量账套的资产负债表补充6个空行
+        if(b.reports){
+            ['bs_reclass', 'bs_std'].forEach(bsk => {
+                let bs = b.reports[bsk];
+                if (bs && bs.data) {
+                    let liabIdx = bs.data.findIndex(x => x.n && x.n.trim() === '负债合计');
+                    let eqIdx = bs.data.findIndex(x => x.n && x.n.trim() === '所有者权益：');
+                    if (liabIdx !== -1 && eqIdx !== -1 && eqIdx === liabIdx + 1) {
+                        bs.data.splice(eqIdx, 0, 
+                            {n:" ",f:"",fb:"",col:2},{n:" ",f:"",fb:"",col:2},{n:" ",f:"",fb:"",col:2},
+                            {n:" ",f:"",fb:"",col:2},{n:" ",f:"",fb:"",col:2},{n:" ",f:"",fb:"",col:2}
+                        );
+                        c = true;
+                    }
                 }
-                grid.appendChild(card);
             });
         }
 
-        function highlight(text, term) {
-            if (!term) return text;
-            return text.replace(new RegExp(`(${term})`, 'gi'), '<mark style="background:#fbbf24;color:#000;padding:0 4px;border-radius:4px">$1</mark>');
+        if(!b.sysAccs||!b.sysAccs.incPrefix){b.sysAccs={...DEFAULT_SYS_ACCS,...b.sysAccs};c=true;}
+        if(b.reports&&b.reports.cf&&JSON.stringify(b.reports.cf).includes("DR('100')")){b.reports.cf=JSON.parse(JSON.stringify(DEFAULT_REPORTS.cf));c=true;}
+        if(c) await window.dbPut('books',b);
+        
+        isClosed=(await window.dbIdx('closings','bookId',id)).some(x=>x.period===curPeriod);
+        accs=(await window.dbIdx('subjects','bookId',id)).sort((x,y)=>x.code.localeCompare(y.code));
+        auxItems=await window.dbIdx('auxItems','bookId',id);
+        currencies=await window.dbIdx('currencies','bookId',id);
+        
+        window.ge('sbName').textContent=b.name;
+        window.ge('sbPeriod').textContent=curPeriod;
+        window.ge('sbStatus').textContent=isClosed?'已结账':'开放中';
+        window.ge('sbStatus').className=`badge ${isClosed?'red':'green'}`;
+        window.ge('sbStd').textContent=b.standardName||'默认准则';
+        
+        window.hide('bootPage');
+        window.show('mainPage');
+        await window.goMenu(tg||'dashboard');
+    }catch(e){
+        alert("❌ 载入账套失败：" + e.message);
+    }
+};
+
+window.exitBook = async function(){
+    if(syncDirHandle&&syncStatus!=='off'){
+        window.setSyncUI('syncing');
+        await window.performAutoSync();
+    }
+    curBook=null; curPeriod=''; isClosed=false; accs=[]; auxItems=[]; currencies=[];
+    window.hide('mainPage'); window.show('bootPage'); window.loadBootPage();
+};
+
+// ==========================================
+// 8. 导入导出辅助逻辑
+// ==========================================
+window.exportTableEl = function(tb, nm, pr=[]) {
+    if(!tb) return; let clone = tb.cloneNode(true);
+    clone.querySelectorAll('.btn, button, .hidden, script, .no-print, .accdrop, label').forEach(el => el.remove());
+    clone.querySelectorAll('input').forEach(i => {if(i.type!=='checkbox') i.replaceWith(document.createTextNode(i.value)); else i.remove();});
+    clone.querySelectorAll('select').forEach(s => s.replaceWith(document.createTextNode(s.options[s.selectedIndex]?.text||'')));
+    clone.querySelectorAll('a').forEach(a => a.replaceWith(document.createTextNode(a.textContent)));
+    let skipIndices = []; let ths = clone.querySelectorAll('thead tr:first-child th');
+    ths.forEach((th, i) => { if(th.textContent.trim().includes('操作')) skipIndices.push(i); });
+    let cs = 1; if(clone.rows.length > 0) cs = Array.from(clone.rows[0].cells).reduce((sum, cell, i) => sum + (skipIndices.includes(i) ? 0 : (parseInt(cell.getAttribute('colspan')) || 1)), 0);
+    clone.querySelectorAll('tr').forEach(tr => {
+        if(tr.style.display === 'none') { tr.remove(); return; }
+        let cells = Array.from(tr.children);
+        for(let i = cells.length - 1; i >= 0; i--) {
+            if(skipIndices.includes(i)) { tr.removeChild(cells[i]); continue; }
+            let c = cells[i], cl = c.className || '', st = "border:0.5pt solid #000000;padding:6px;font-size:10pt;";
+            let cStyle = c.getAttribute('style') || '';
+            cStyle = cStyle.replace(/var\(--bg-body\)/gi, '#f8fafc').replace(/var\(--primary-light\)/gi, '#eff6ff').replace(/var\(--success-light\)/gi, '#f0fdf4').replace(/var\(--warning-light\)/gi, '#fffbeb');
+            st += cStyle;
+            if(cl.includes('qty-col')) { st += "text-align:right;mso-number-format:'General';"; }
+            else if(cl.includes('tr')) { st += "text-align:right;"; if(cl.includes('dr-val') || cl.includes('cr-val') || cl.includes('mono')) st += "mso-number-format:'\\#\\,\\#\\#0\\.00_\\)\\;\\[Red\\]\\\\(\\#\\,\\#\\#0\\.00\\\\)';"; } 
+            else if(cl.includes('tc')) { st += "text-align:center;mso-number-format:'\\@';"; } else { st += "text-align:left;mso-number-format:'\\@';"; }
+            if(cl.includes('bold') || c.tagName==='TH' || (c.parentElement && c.parentElement.classList.contains('highlight'))) st += "font-weight:bold;";
+            if(cl.includes('dr-val')) st += "color:#dc2626;"; if(cl.includes('cr-val')) st += "color:#16a34a;";
+            if(cl.includes('color-p')) st += "color:#2563eb;"; if(cl.includes('color-d')) st += "color:#dc2626;";
+            if(cl.includes('color-m')) st += "color:#64748b;"; if(cl.includes('color-i') || cl.includes('qty-col')) st += "color:#0ea5e9;";
+            if (c.tagName === 'TH' && !st.includes('background')) st += "background-color:#f1f5f9;"; c.setAttribute('style', st);
         }
-
-        function searchTools() {
-            const term = document.getElementById('searchInput').value.trim().toLowerCase();
-            const filtered = term 
-                ? tools.filter(t => t.title.toLowerCase().includes(term) || t.desc.toLowerCase().includes(term))
-                : tools;
-            renderTools(filtered, term);
+    });
+    let prHtml = pr.map(r => {
+        if(!r || !r.length) return `<tr><td colspan="${cs}" style="height:10px;border:none;"></td></tr>`;
+        let isTitle = r.length === 1; return `<tr><td colspan="${cs}" style="font-size:${isTitle?'18px':'12px'};font-weight:${isTitle?'bold':'normal'};text-align:${isTitle?'center':'left'};border:none;">${window.esc(r.join('    '))}</td></tr>`;
+    }).join('');
+    let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><style>table { border-collapse: collapse; font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; white-space: normal; word-wrap: break-word; } .color-p { color: #2563eb; } .color-d { color: #dc2626; } .color-m { color: #64748b; } .dr-val { color: #dc2626; } .cr-val { color: #16a34a; } br { mso-data-placement:same-cell; }</style></head><body><table>${prHtml}</table><table>${clone.innerHTML}</table></body></html>`;
+    let blob = new Blob([html], { type: 'application/vnd.ms-excel' }); let url = URL.createObjectURL(blob); let a = document.createElement('a'); a.href = url; a.download = nm + '.xls'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 100);
+};
+window.exportAOA = function(d,n){let c=d.map(r=>r.map(v=>{let s=String(v||'');return s.includes(',')||s.includes('"')||s.includes('\n')?'"'+s.replace(/"/g,'""')+'"':s;}).join(',')).join('\n'),b=new Blob(['\uFEFF'+c],{type:'text/csv;charset=utf-8'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=n+'.csv';a.click();URL.revokeObjectURL(u);};
+window.triggerImport = function(m){curImportMode=m;window.ge('genericImportInp').click();};
+window.parseCSV = function(s){let r=[],t=[],b='',iq=!1;for(let i=0;i<s.length;i++){let c=s[i],nc=s[i+1];if(c==='"'&&nc==='"'){b+='"';i++;}else if(c==='"')iq=!iq;else if(c===','&&!iq){t.push(b);b='';}else if((c==='\n'||(c==='\r'&&nc==='\n'))&&!iq){t.push(b);r.push(t);t=[];b='';if(c==='\r')i++;}else b+=c;}if(b||t.length){t.push(b);r.push(t);}return r;};
+window.exportCurTable = function(){let tb=window.qs('.tbl')||window.qs('.rep-tbl');if(tb)window.exportTableEl(tb,TITLES[curMenu]||curMenu);};
+window.handleGenericImport = async function(i){
+    let f=i.files[0];if(!f)return;
+    let r=new FileReader();
+    r.onload=async e=>{
+        let ls=window.parseCSV(e.target.result),ad=0,up=0;
+        for(let j=1;j<ls.length;j++){
+            let w=ls[j];if(w.length<2)continue;
+            try{
+                if(curImportMode==='init-bal'){
+                    let c=w[0].trim(),v=+w[3]||+w[1]||0,fv=+w[4]||0,a=accs.find(x=>x.code===c);
+                    if(a&&window.isLeafAcc(c)&&(a.initBal!==v||a.initFcBal!==fv)){a.initBal=v;if(a.currency)a.initFcBal=fv;await window.dbPut('subjects',a);up++;}
+                }else if(curImportMode==='auxiliary'){
+                    if(w[0]&&w[1]){
+                        let ac=(w[3]||'').split(' ')[0],aa=accs.find(x=>x.code===ac),ex=auxItems.find(x=>x.code===w[0].trim()),d={code:w[0].trim(),name:w[1].trim(),category:w[2].trim()||'其他',accountId:aa?aa.id:null,bookId:curBook.id};
+                        if(ex){d.id=ex.id;await window.dbPut('auxItems',d);up++;}else{await window.dbAdd('auxItems',d);ad++;}
+                    }
+                }
+            }catch(err){}
         }
+        alert('导入成功！新增 '+ad+' 条，更新 '+up+' 条。');
+        i.value='';
+        if(curImportMode==='init-bal'){
+            accs=(await window.dbIdx('subjects','bookId',curBook.id)).sort((a,b)=>a.code.localeCompare(b.code));
+            if(typeof window.pgInitBal === 'function') window.pgInitBal();
+        }else if(curImportMode==='auxiliary'){
+            if(typeof window.pgAuxiliary === 'function') window.pgAuxiliary();
+        }
+    };
+    r.readAsText(f,'UTF-8');
+};
 
-        document.getElementById('searchInput').addEventListener('input', searchTools);
-        document.getElementById('searchInput').addEventListener('keypress', e => { if (e.key === 'Enter') searchTools(); });
+// ==========================================
+// 10. 系统底层高强度容错启动器
+// ==========================================
+window.initSystem = async function() { 
+    try {
+        if (!window.indexedDB) throw new Error("您的浏览器不支持或禁用了本地数据库(IndexedDB)。");
+        await window.openDB(); 
+        await window.loadBootPage(); 
+    } catch(e) {
+        let box = window.ge('bookListEl');
+        if (box) {
+            box.innerHTML = `
+                <div style="height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--danger);border:2px dashed var(--danger);border-radius:8px;padding:20px;text-align:center;">
+                    <b style="font-size:16px;">❌ 本地环境引擎初始化失败</b>
+                    <span style="font-size:13px;margin-top:12px;color:var(--text-main);line-height:1.6;">
+                        非常抱歉，底层数据库访问权限被浏览器强行阻断：<br>
+                        <strong style="color:var(--danger);">${window.esc(e.message)}</strong><br><br>
+                        <span style="color:var(--text-muted);">可能的原因是您处于<b>【无痕模式/隐私窗口】</b>，<br>或者直接双击本地文件遭到了浏览器的极限安全隔离拦截。</span>
+                    </span>
+                </div>
+            `;
+        }
+        let createBtn = document.querySelector('button[onclick="window.createBook()"]');
+        if (createBtn) {
+            createBtn.disabled = true;
+            createBtn.style.background = 'var(--text-muted)';
+            createBtn.textContent = '❌ 运行环境异常，建账系统已冻结';
+        }
+    }
+};
 
-        renderTools(tools);
-    </script>
+window.initSystem();
+</script>
 </body>
 </html>

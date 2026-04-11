@@ -1,0 +1,644 @@
+<script>
+// =========================================================================
+// 模块二：账簿查询 (总账、余额表、明细账、辅助汇总、辅助明细)
+// =========================================================================
+
+// -------------------------------------------------------------------------
+// 1. 总分类账 (Ledger General)
+// -------------------------------------------------------------------------
+window.pgLedgerGeneral = async function() {
+    ge('pageEl').innerHTML = `
+    <div class="card">
+        <div class="flex-row mb-3 bg-body p-3 no-print" style="padding:12px;border-radius:8px;border:1px solid #cbd5e1;">
+            <input id="glY" type="number" value="${curPeriod.substring(0,4)}" class="inp" style="width:100px;" onchange="calcLedgerGeneral()">
+            <span class="color-m">年度</span>
+            <select id="glAcc" class="sel f1" onchange="calcLedgerGeneral()">
+                <option value="ALL">-- [全部一级科目批量查询] --</option>
+                ${accs.filter(a => a.code.length === 4).map(a => `<option value="${a.code}">${a.code} ${esc(a.name)}</option>`).join('')}
+            </select>
+            <button onclick="calcLedgerGeneral()" class="btn btn-p" style="padding:8px 16px;">🔍 查询总分类账</button>
+        </div>
+        <div class="alert alert-info py-2 no-print"><b>💡 说明：</b>总分类账用于查询一级科目在整个年度内按月汇总的发生额和结余情况。支持一键查询全部一级科目。</div>
+        <div class="table-wrap">
+            <table class="tbl">
+                <thead>
+                    <tr>
+                        <th class="tc">期间</th><th class="tl">摘要</th><th class="tr">借方发生额</th><th class="tr">贷方发生额</th><th class="tc">方向</th><th class="tr">余额</th>
+                    </tr>
+                </thead>
+                <tbody id="glBody"><tr><td colspan="6" class="tc color-m py-4">点击查询加载总账数据</td></tr></tbody>
+            </table>
+        </div>
+    </div>`;
+    setTimeout(calcLedgerGeneral, 50);
+};
+
+window.calcLedgerGeneral = async function() {
+    let y = ge('glY').value, mode = ge('glAcc').value;
+    if(!y || !mode) return;
+    
+    let targetCodes = mode === 'ALL' ? accs.filter(a => a.code.length === 4).map(a => a.code) : [mode];
+    let finalHtml = "";
+
+    let pStart = (y - 1) + '-12';
+    let bm = await calcTAcc(pStart, false, null, '已审核');
+    let av = await dbIdx('vouchers', 'bookId', curBook.id);
+    let esAll = await dbIdx('entries', 'bookId', curBook.id);
+    let vM = {}; 
+    av.forEach(v => { if (v.period.startsWith(y) && v.status === '已审核') vM[v.id] = v; });
+
+    for (let acCode of targetCodes) {
+        let ac = accs.find(a => a.code === acCode);
+        if(!ac) continue;
+
+        let tc = accs.filter(a => a.code.startsWith(acCode)).map(a => a.id);
+        let bal = 0;
+        tc.forEach(i => { if(bm[i]) bal += bm[i].bal; });
+
+        let rs = [];
+        rs.push({ m: '', sum: '年初余额', d: null, c: null, dir: ac.direction, bal: Math.abs(bal), isBold: true });
+
+        let yD = 0, yC = 0;
+        let mm = {};
+        for(let i=1; i<=12; i++) {
+            let mp = y + '-' + String(i).padStart(2,'0');
+            if(mp > curPeriod) break;
+            mm[mp] = { d: 0, c: 0 };
+        }
+
+        esAll.forEach(e => {
+            if(tc.includes(e.accId) && vM[e.voucherId]) {
+                let p = vM[e.voucherId].period;
+                if(mm[p]) {
+                    mm[p].d += e.deb || 0;
+                    mm[p].c += e.cre || 0;
+                }
+            }
+        });
+
+        let rawBal = bal * (ac.direction === '借' ? 1 : -1); 
+        let keys = Object.keys(mm).sort();
+        
+        for(let p of keys) {
+            let d = mm[p].d, c = mm[p].c;
+            rawBal += (d - c);
+            yD += d; yC += c;
+            let dispDir = rawBal >= 0 ? '借' : '贷';
+            let dispBal = Math.abs(rawBal);
+            if (rawBal === 0) { dispDir = '平'; dispBal = 0; }
+            
+            rs.push({ m: p.split('-')[1] + '月', sum: '本期发生额', d: d, c: c, dir: dispDir, bal: dispBal, isBold: false });
+            rs.push({ m: p.split('-')[1] + '月', sum: '本年累计', d: yD, c: yC, dir: dispDir, bal: dispBal, isBold: true });
+        }
+
+        finalHtml += `<tr class="highlight"><td colspan="6" style="background:var(--primary-light); font-weight:bold; font-size: 14px; border-top: 2px solid var(--primary);">科目：${ac.code} ${typeof getFullAccName === 'function' ? getFullAccName(ac.code) : ac.name}</td></tr>`;
+        
+        finalHtml += rs.map(r => `
+          <tr class="${r.isBold?'highlight':''}">
+            <td class="tc mono text-sm">${esc(r.m)}</td>
+            <td class="tl">${esc(r.sum)}</td>
+            <td class="tr dr-val">${r.d !== null ? fa(r.d) : ''}</td>
+            <td class="tr cr-val">${r.c !== null ? fa(r.c) : ''}</td>
+            <td class="tc color-m">${esc(r.dir)}</td>
+            <td class="tr mono bold color-p" style="font-size:14px;">${fa(r.bal)}</td>
+          </tr>
+        `).join('');
+    }
+
+    ge('glBody').innerHTML = finalHtml || `<tr><td colspan="6" class="tc color-m py-4">未找到相关数据</td></tr>`;
+};
+
+window.exportLedgerGeneral = function() {
+    let y = ge('glY')?.value || curPeriod.substring(0,4);
+    let accText = ge('glAcc') ? (ge('glAcc').options[ge('glAcc').selectedIndex]?.text.trim() || '') : '';
+    exportTableEl(qs('.tbl'), '总分类账_' + y, [['总分类账'], [`编制单位：${curBook.name}     科目：${accText}     年度：${y}`]]);
+};
+
+
+// -------------------------------------------------------------------------
+// 2. 多形态 科目余额表 (Ledger Balance)
+// -------------------------------------------------------------------------
+window.toggleAuxInBalance = function() {
+    let lv = ge('blLv').value;
+    let auxSel = ge('blAux');
+    if (auxSel) {
+        if (lv === 'all') {
+            auxSel.style.display = 'inline-block';
+        } else {
+            auxSel.style.display = 'none';
+            auxSel.value = ''; 
+        }
+    }
+};
+
+window.pgLedgerBalance = async function() {
+    if (typeof window.blMergeDirState === 'undefined') window.blMergeDirState = false;
+
+    ge('pageEl').innerHTML = `
+    <div class="card">
+        <div class="flex-row mb-3 bg-body p-3 no-print" style="padding:12px;border-radius:8px;border:1px solid #cbd5e1;">
+            <input id="blP" type="month" value="${curPeriod}" class="inp" style="width:130px;" onchange="calcBalance()">
+            <input id="blKw" class="inp" style="width:130px;" placeholder="检索科目..." oninput="if(this.dataset.t)clearTimeout(this.dataset.t);this.dataset.t=setTimeout(calcBalance,400)">
+            <select id="blLv" class="sel" style="width:110px;" onchange="toggleAuxInBalance(); calcBalance()">
+                <option value="1" selected>一级科目</option>
+                <option value="2">二级科目</option>
+                <option value="3">三级科目</option>
+                <option value="4">四级科目</option>
+                <option value="all">末级明细</option>
+            </select>
+            <select id="blPar" class="sel f1" onchange="calcBalance()">
+                <option value="">全部会计科目</option>
+                ${accs.filter(a => a.code.length === 4).map(a => `<option value="${a.code}">${a.code} ${esc(a.name)}</option>`).join('')}
+            </select>
+            <select id="blAux" class="sel" style="width:160px;" onchange="calcBalance()">
+                <option value="">全部辅助核算子目</option>
+                ${auxItems.map(x => `<option value="${x.id}">${esc('['+x.category+'] '+x.name)}</option>`).join('')}
+            </select>
+            <select id="blSt" class="sel" style="width:100px;" onchange="calcBalance()">
+                <option value="">包含未审</option><option>仅已审</option>
+            </select>
+            <button id="blShowQtyBtn" onclick="blShowQtyState=!blShowQtyState;calcBalance()" class="btn ${blShowQtyState?'btn-p':'btn-n'} ml-2" style="padding:8px 12px; font-weight:bold;">${blShowQtyState?'☑️ 数量专列':'☐ 数量专列'}</button>
+            <button id="blMergeDirBtn" onclick="window.blMergeDirState=!window.blMergeDirState;calcBalance()" class="btn ${window.blMergeDirState?'btn-p':'btn-n'} ml-2" style="padding:8px 12px; font-weight:bold;">${window.blMergeDirState?'☑️ 余额单列':'☐ 余额单列'}</button>
+            <button onclick="calcBalance()" class="btn btn-p ml-2" style="padding:8px 16px;">🔍 刷新</button>
+        </div>
+        <div class="alert alert-info py-2 no-print"><b>💡 高效提示：</b>只有查询<b>【末级明细】</b>时，辅助核算筛选项才会开放。开启【余额单列】后，期末余额会将借贷方轧差后的净额，以正负数的形式全部单列显示在借方列中。更改条件直接触发刷新。</div>
+        <div class="table-wrap">
+            <table class="tbl" id="tblBal" style="min-width:1150px;white-space:nowrap;table-layout:auto;">
+                <thead id="blThead"><tr><th class="tc py-4 color-m" style="border:none;">系统极速加载中...</th></tr></thead>
+                <tbody id="blBody"></tbody>
+            </table>
+        </div>
+    </div>`;
+    setTimeout(() => { toggleAuxInBalance(); calcBalance(); ge('blKw')?.focus(); }, 50);
+};
+
+window.calcBalance = async function() {
+    let p = ge('blP').value, lv = ge('blLv').value, par = ge('blPar').value, ax = lv === 'all' ? ge('blAux').value : '', st = ge('blSt').value || null;
+    let kw = ge('blKw') ? ge('blKw').value.trim().toLowerCase() : '';
+    if (!p) return;
+    
+    let showQ = blShowQtyState;
+    if (typeof window.blMergeDirState === 'undefined') window.blMergeDirState = false;
+    let mergeDir = window.blMergeDirState;
+    
+    if (ge('blShowQtyBtn')) {
+        let btn = ge('blShowQtyBtn');
+        btn.className = `btn ${showQ ? 'btn-p' : 'btn-n'} ml-2`;
+        btn.textContent = showQ ? '☑️ 数量专列' : '☐ 数量专列';
+    }
+    if (ge('blMergeDirBtn')) {
+        let mBtn = ge('blMergeDirBtn');
+        mBtn.className = `btn ${mergeDir ? 'btn-p' : 'btn-n'} ml-2`;
+        mBtn.textContent = mergeDir ? '☑️ 余额借方单列' : '☐ 余额借方单列';
+    }
+
+    ge('tblBal').style.minWidth = showQ ? '1500px' : '1150px';
+
+    let thH = `<tr style="height:36px;">
+        <th rowspan="2" class="tc" style="width:6%;z-index:3;position:sticky;top:0;box-sizing:border-box;">科目编码</th>
+        <th rowspan="2" class="tl" style="width:14%;z-index:3;position:sticky;top:0;box-sizing:border-box;">科目名称</th>
+        <th rowspan="2" class="tc" style="width:6%;z-index:3;position:sticky;top:0;box-sizing:border-box;">辅助核算</th>
+        <th colspan="${showQ?4:2}" class="tc" style="background:var(--bg-body);position:sticky;top:0;z-index:2;box-sizing:border-box;">期初余额</th>
+        <th colspan="${showQ?4:2}" class="tc" style="background:var(--primary-light);position:sticky;top:0;z-index:2;box-sizing:border-box;">本期发生额</th>
+        <th colspan="${showQ?4:2}" class="tc" style="background:var(--warning-light);position:sticky;top:0;z-index:2;box-sizing:border-box;">本年累计发生额</th>
+        <th colspan="${showQ?4:2}" class="tc" style="background:var(--success-light);position:sticky;top:0;z-index:2;box-sizing:border-box;">期末余额</th>
+    </tr><tr style="height:36px;">`;
+    [{bg:'#f1f5f9'},{bg:'#dbeafe'},{bg:'#fef3c7'},{bg:'#dcfce7'}].forEach(t => {
+        if (showQ) thH += `<th class="tr" style="background:${t.bg};top:36px;color:#0ea5e9;position:sticky;z-index:2;box-sizing:border-box;">借方数量</th>`;
+        thH += `<th class="tr" style="background:${t.bg};top:36px;position:sticky;z-index:2;box-sizing:border-box;">借方${showQ?'金额':''}</th>`;
+        if (showQ) thH += `<th class="tr" style="background:${t.bg};top:36px;color:#0ea5e9;position:sticky;z-index:2;box-sizing:border-box;">贷方数量</th>`;
+        thH += `<th class="tr" style="background:${t.bg};top:36px;position:sticky;z-index:2;box-sizing:border-box;">贷方${showQ?'金额':''}</th>`;
+    });
+    thH += `</tr>`;
+    ge('blThead').innerHTML = thH;
+
+    let yr = p.substring(0,4), sYr = yr + '-01', sm = {};
+    accs.forEach(a => sm[a.id+'|'] = {
+        code:a.code, name:a.name, dir:a.direction, currency:a.currency, isQty:a.isQty, unit:a.unit,
+        auxId:'', auxName:'', bD:0, bC:0, pD:0, pC:0, yD:0, yC:0, eD:0, eC:0, fBd:0, fBc:0, fpD:0, fpC:0,
+        fyD:0, fyC:0, feD:0, feC:0, qBd:0, qBc:0, pQd:0, pQc:0, yQd:0, yQc:0, qEd:0, qEc:0,
+        initBal:a.initBal||0, initFcBal:a.initFcBal||0, initQty:a.initQty||0
+    });
+    
+    let av = await dbIdx('vouchers','bookId',curBook.id), vM = {};
+    av.forEach(v => { if ((!st || v.status === '已审核') && v.period <= p) vM[v.id] = v; });
+    
+    (await dbIdx('entries','bookId',curBook.id)).forEach(e => {
+        let v = vM[e.voucherId]; if (!v) return;
+        let isP = v.period < p, isC = v.period === p, isY = v.period >= sYr && v.period <= p;
+        let a = accs.find(x => x.id == e.accId); if (!a) return;
+        
+        let uA = ac => {
+            if (isP) { ac.bD += +e.deb || 0; ac.bC += +e.cre || 0; if(e.currency){ac.fBd += +e.deb>0?(+e.fcAmount||0):0; ac.fBc += +e.cre>0?(+e.fcAmount||0):0;} if(a.isQty){ac.qBd += +e.deb>0?(+e.qty||0):0; ac.qBc += +e.cre>0?(+e.qty||0):0;} }
+            if (isC) { ac.pD += +e.deb || 0; ac.pC += +e.cre || 0; if(e.currency){ac.fpD += +e.deb>0?(+e.fcAmount||0):0; ac.fpC += +e.cre>0?(+e.fcAmount||0):0;} if(a.isQty){ac.pQd += +e.deb>0?(+e.qty||0):0; ac.pQc += +e.cre>0?(+e.qty||0):0;} }
+            if (isY) { ac.yD += +e.deb || 0; ac.yC += +e.cre || 0; if(e.currency){ac.fyD += +e.deb>0?(+e.fcAmount||0):0; ac.fyC += +e.cre>0?(+e.fcAmount||0):0;} if(a.isQty){ac.yQd += +e.deb>0?(+e.qty||0):0; ac.yQc += +e.cre>0?(+e.qty||0):0;} }
+        };
+        
+        uA(sm[e.accId+'|']);
+        if (e.auxId) {
+            let ky = e.accId + '|' + e.auxId, at = sm[ky];
+            if (!at) {
+                let x = auxItems.find(y => y.id == e.auxId);
+                at = sm[ky] = { code:a.code, name:a.name, dir:a.direction, currency:a.currency, isQty:a.isQty, unit:a.unit, auxId:e.auxId, auxName:x?`[${x.category}] ${x.name}`:'', bD:0, bC:0, pD:0, pC:0, yD:0, yC:0, eD:0, eC:0, fBd:0, fBc:0, fpD:0, fpC:0, fyD:0, fyC:0, feD:0, feC:0, qBd:0, qBc:0, pQd:0, pQc:0, yQd:0, yQc:0, qEd:0, qEc:0, initBal:0, initFcBal:0, initQty:0 };
+            }
+            uA(at);
+        }
+    });
+    
+    for (let k in sm) {
+        let r = sm[k];
+        if (k.endsWith('|')) {
+            if(r.dir==='借'){r.bD+=r.initBal; r.fBd+=r.initFcBal; r.qBd+=r.initQty;}else{r.bC+=r.initBal; r.fBc+=r.initFcBal; r.qBc+=r.initQty;}
+        }
+        let n = r.bD - r.bC, nf = r.fBd - r.fBc, nq = r.qBd - r.qBc;
+        if(r.dir==='借'){r.bD=Math.max(0,n); r.bC=Math.max(0,-n); r.fBd=Math.max(0,nf); r.fBc=Math.max(0,-nf); r.qBd=Math.max(0,nq); r.qBc=Math.max(0,-nq);}
+        else{r.bC=Math.max(0,-n); r.bD=Math.max(0,n); r.fBc=Math.max(0,-nf); r.fBd=Math.max(0,nf); r.qBc=Math.max(0,-nq); r.qBd=Math.max(0,nq);}
+    }
+    
+    let rd = Object.values(sm).filter(r => r.bD||r.bC||r.pD||r.pC||r.yD||r.yC||r.fBd||r.fBc||r.fpD||r.fpC||r.qBd||r.qBc||r.pQd||r.pQc);
+    let res = [];
+    
+    if(lv === 'all') {
+        rd.forEach(r => {
+            let b = r.dir==='借' ? (r.bD-r.bC+r.pD-r.pC) : (r.bC-r.bD+r.pC-r.pD), fb = r.dir==='借' ? (r.fBd-r.fBc+r.fpD-r.fpC) : (r.fBc-r.fBd+r.fpC-r.fpD), qb = r.dir==='借' ? (r.qBd-r.qBc+r.pQd-r.pQc) : (r.qBc-r.qBd+r.pQc-r.pQd);
+            if(r.dir==='借'){r.eD=Math.max(0,b); r.eC=Math.max(0,-b); r.feD=Math.max(0,fb); r.feC=Math.max(0,-fb); r.qEd=Math.max(0,qb); r.qEc=Math.max(0,-qb);}
+            else{r.eC=Math.max(0,b); r.eD=Math.max(0,-b); r.feC=Math.max(0,fb); r.feD=Math.max(0,-fb); r.qEc=Math.max(0,qb); r.qEd=Math.max(0,-qb);}
+        });
+        res = rd;
+    } else {
+        let tl = 4;
+        if (lv === '2') tl = 6;
+        if (lv === '3') tl = 8;
+        if (lv === '4') tl = 10;
+        
+        let ag = {};
+        rd.forEach(r => {
+            let c = r.code.length > tl ? r.code.substring(0,tl) : r.code;
+            let pa = accs.find(a=>a.code===c);
+            let ky = c; 
+            if(!ag[ky]) ag[ky] = { code:c, name:pa?pa.name:r.name, auxId:'', auxName:'', dir:pa?pa.direction:r.dir, currency:pa?pa.currency:'', isQty:pa?pa.isQty:false, unit:pa?pa.unit:'', bD:0, bC:0, pD:0, pC:0, yD:0, yC:0, eD:0, eC:0, qBd:0, qBc:0, pQd:0, pQc:0, yQd:0, yQc:0, qEd:0, qEc:0, fBd:0, fBc:0, fpD:0, fpC:0, fyD:0, fyC:0, feD:0, feC:0 };
+            let x = ag[ky];
+            x.bD += r.dir==='借'?r.bD:-r.bC; x.bC += r.dir==='贷'?r.bC:-r.bD; x.pD += r.pD; x.pC += r.pC; x.yD += r.yD; x.yC += r.yC;
+            if(r.currency){x.fBd+=r.dir==='借'?r.fBd:-r.fBc; x.fBc+=r.dir==='贷'?r.fBc:-r.fBd; x.fpD+=r.fpD; x.fpC+=r.fpC; x.fyD+=r.fyD; x.fyC+=r.fyC;}
+            if(r.isQty){x.qBd+=r.dir==='借'?r.qBd:-r.qBc; x.qBc+=r.dir==='贷'?r.qBc:-r.qBd; x.pQd+=r.pQd; x.pQc+=r.pQc; x.yQd+=r.yQd; x.yQc+=r.yQc;}
+        });
+        res = Object.values(ag).map(r => {
+            if(r.dir==='借'){r.bC=r.bD<0?-r.bD:0;r.bD=Math.max(0,r.bD);r.fBc=r.fBd<0?-r.fBc:0;r.fBd=Math.max(0,r.fBd);r.qBc=r.qBd<0?-r.qBc:0;r.qBd=Math.max(0,r.qBd);}
+            else{r.bD=r.bC<0?-r.bC:0;r.bC=Math.max(0,r.bC);r.fBd=r.fBc<0?-r.fBc:0;r.fBc=Math.max(0,r.fBc);r.qBd=r.qBc<0?-r.qBc:0;r.qBc=Math.max(0,r.qBc);}
+            let b = r.dir==='借'?(r.bD-r.bC+r.pD-r.pC):(r.bC-r.bD+r.pC-r.pD), fb = r.dir==='借'?(r.fBd-r.fBc+r.fpD-r.fpC):(r.fBc-r.fBd+r.fpC-r.fpD), qb = r.dir==='借'?(r.qBd-r.qBc+r.pQd-r.pQc):(r.qBc-r.qBd+r.pQc-r.pQd);
+            if(r.dir==='借'){r.eD=Math.max(0,b);r.eC=Math.max(0,-b);r.feD=Math.max(0,fb);r.feC=Math.max(0,-fb);r.qEd=Math.max(0,qb);r.qEc=Math.max(0,-qb);}
+            else{r.eC=Math.max(0,b);r.eD=Math.max(0,-b);r.feC=Math.max(0,fb);r.feD=Math.max(0,-fb);r.qEc=Math.max(0,qb);r.qEd=Math.max(0,-qb);}
+            return r;
+        });
+    }
+    
+    if(par) res = res.filter(r => r.code.startsWith(par));
+    if(ax) res = res.filter(r => String(r.auxId) === String(ax));
+    if(kw) res = res.filter(r => r.code.includes(kw) || r.name.toLowerCase().includes(kw));
+    res.sort((a,b) => a.code !== b.code ? a.code.localeCompare(b.code) : (a.auxId||'').toString().localeCompare((b.auxId||'').toString()));
+    blData = res;
+
+    const ctd = (bg, cls, amt, fc, cur, qty, unit, hideAll = false) => {
+        if (hideAll) {
+            let h = '';
+            if (showQ) h += `<td class="tr mono qty-col" style="vertical-align:top;${bg?`background:${bg};`:''}"></td>`;
+            h += `<td class="tr mono ${cls}" style="vertical-align:top;${bg?`background:${bg};`:''}"></td>`;
+            return h;
+        }
+        let h = '';
+        if(showQ) {
+            h += `<td class="tr mono qty-col" style="vertical-align:top;${bg?`background:${bg};`:''}color:#0ea5e9;">${qty?fq(qty):''}</td>`;
+        }
+        h += `<td class="tr mono ${cls}" style="vertical-align:top;${bg?`background:${bg};`:''}">${fmtV(amt,fc,cur,qty,unit,true)}</td>`;
+        return h;
+    };
+
+    ge('blBody').innerHTML = res.length ? res.map(r => {
+        let badgeQty = '';
+        if (lv === 'all' && r.isQty) { badgeQty = ` <span class="badge blue" title="数量核算单位">${showQ?'量:'+esc(r.unit||''):'量'}</span>`; }
+        
+        let nameHtml = '';
+        if (lv === 'all') {
+            let fullName = typeof getFullAccName === 'function' ? getFullAccName(r.code) : r.name;
+            let parts = fullName.split('-');
+            let parentPath = parts.length > 1 ? parts.slice(0, -1).join(' / ') : '';
+            nameHtml = parentPath 
+                ? `<div class="text-xs color-m" style="font-weight:normal;line-height:1.2;margin-bottom:2px;">${esc(parentPath)}</div><div>${esc(r.name)}${r.currency?` <span class="badge purple">${r.currency}</span>`:''}${badgeQty}</div>`
+                : `<div>${esc(r.name)}${r.currency?` <span class="badge purple">${r.currency}</span>`:''}${badgeQty}</div>`;
+        } else {
+            nameHtml = `${'&nbsp;'.repeat(Math.max(0,r.code.length-4)*2)+(r.code.length>4?'└ ': '')}${esc(r.name)}${r.currency?` <span class="badge purple">${r.currency}</span>`:''}${badgeQty}`;
+        }
+        
+        let base = `<td class="tc mono bold"><a href="javascript:void(0)" onclick="navToDetail('${r.code}','${p}','${r.auxId||''}')" style="color:var(--primary);text-decoration:none;border-bottom:1px dashed currentColor;" title="点击穿透至明细账">${esc(r.code)}</a></td>
+        <td class="bold">${nameHtml}</td>
+        <td class="tc">${r.auxName?`<span class="badge gray" style="white-space:normal;text-align:left;">${esc(r.auxName)}</span>`:'-'}</td>`;
+        
+        // 核心轧差合并显示逻辑
+        let disp_eD = r.eD, disp_feD = r.feD, disp_qEd = r.qEd;
+        if (mergeDir) {
+            disp_eD = r.eD - r.eC;
+            disp_feD = r.feD - r.feC;
+            disp_qEd = r.qEd - r.qEc;
+        }
+
+        return `<tr>${base}
+            ${ctd('','',r.bD,r.fBd,r.currency,r.qBd,r.unit)}
+            ${ctd('','',r.bC,r.fBc,r.currency,r.qBc,r.unit)}
+            ${ctd('','dr-val',r.pD,r.fpD,r.currency,r.pQd,r.unit)}
+            ${ctd('','cr-val',r.pC,r.fpC,r.currency,r.pQc,r.unit)}
+            ${ctd('#fffbeb','',r.yD,r.fyD,r.currency,r.yQd,r.unit)}
+            ${ctd('#fffbeb','',r.yC,r.fyC,r.currency,r.yQc,r.unit)}
+            ${ctd('','bold color-p',disp_eD,disp_feD,r.currency,disp_qEd,r.unit)}
+            ${ctd('','bold color-p',r.eC,r.feC,r.currency,r.qEc,r.unit, mergeDir)}
+        </tr>`;
+    }).join('') : `<tr><td colspan="${showQ?19:11}" class="tc color-m py-4">未找到相关数据</td></tr>`;
+};
+
+window.exportBlData = function() {
+    let p = ge('blP')?.value || curPeriod;
+    exportTableEl(ge('tblBal'), `科目余额表_${blShowQtyState?'数量金额式':'金额式'}_${p}`, [['科目余额表'], [`编制单位：${curBook.name}     查询期间：${p}`]]);
+};
+
+
+// -------------------------------------------------------------------------
+// 3. 科目明细账 (Ledger Detail)
+// -------------------------------------------------------------------------
+window.pgLedgerDetail = async function() {
+    ge('pageEl').innerHTML = `
+    <div class="card">
+        <div class="flex-row mb-3 bg-body p-3 no-print" style="padding:12px;border-radius:8px;border:1px solid #cbd5e1;">
+            <input id="dlP" type="month" value="${curPeriod}" class="inp" style="width:140px;" onchange="calcDetail()">
+            <select id="dlAcc" class="sel f1" onchange="calcDetail()">
+                <option value="ALL">-- [全部末级科目批量查询] --</option>
+                ${accs.map(a => `<option value="${a.id}">${'&nbsp;'.repeat(Math.max(0,a.code.length-4)*2)}${a.code} ${esc(a.name)}</option>`).join('')}
+            </select>
+            <select id="dlAux" class="sel" style="width:180px;" onchange="calcDetail()">
+                <option value="">全部辅助核算子目</option>
+                ${auxItems.map(x => `<option value="${x.id}">${esc('['+x.category+'] '+x.name)}</option>`).join('')}
+            </select>
+            <select id="dlSt" class="sel" style="width:120px;" onchange="calcDetail()">
+                <option value="">包含未审</option><option>仅已审</option>
+            </select>
+            <button onclick="calcDetail()" class="btn btn-p">刷新明细</button>
+        </div>
+        <div class="table-wrap">
+            <table class="tbl">
+                <thead>
+                    <tr><th class="tc">日期</th><th class="tc">凭证号</th><th class="tl">摘要</th><th class="tl">科目名称</th><th class="tc">辅助/现金流</th><th class="tr">借方发生额</th><th class="tr">贷方发生额</th><th class="tc">方向</th><th class="tr">余额</th></tr>
+                </thead>
+                <tbody id="dlBody"><tr><td colspan="9" class="tc color-m py-4">请选择科目查询</td></tr></tbody>
+            </table>
+        </div>
+    </div>`;
+};
+
+window.calcDetail = async function() {
+    let mode = ge('dlAcc').value; if (!mode) return;
+    let targetIds = mode === 'ALL' ? accs.filter(a => isLeafAcc(a.code)).map(a => a.id) : [+mode];
+    
+    let p = ge('dlP').value, ax = ge('dlAux').value, st = ge('dlSt').value;
+    let bm = await calcTAcc(prevP(p), false, null, st === '仅已审' ? '已审核' : null);
+    
+    let vsAll = await dbIdx('vouchers', 'bookId', curBook.id);
+    let esAll = await dbIdx('entries', 'bookId', curBook.id);
+    let finalHtml = "";
+    
+    for(let id of targetIds) {
+        let t = accs.find(a => a.id === id);
+        if (!t) continue;
+        
+        let tc = accs.filter(a => a.code.startsWith(t.code)).map(a => a.id);
+        let bal = 0, fcBal = 0, qBal = 0;
+        tc.forEach(i => { if (bm[i]) { bal += bm[i].bal; fcBal += bm[i].fcBal; qBal += bm[i].qBal; } }); 
+        
+        let curData = [{date:'', vno:'', vid:null, summary:'期初余额', accName:'', deb:null, cre:null, dir:t.direction, bal, fcStr:fmtV(0,fcBal,t.currency,qBal,t.unit).replace('0.00<br>',''), auxName:'', bold:true}];
+        
+        let vs = vsAll.filter(v => v.period === p && (st === '仅已审' ? v.status === '已审核' : true)).sort((a,b) => a.date.localeCompare(b.date));
+        let vids = new Set(vs.map(v => v.id));
+        let es = esAll.filter(e => tc.includes(e.accId) && vids.has(e.voucherId) && (ax ? String(e.auxId) === String(ax) : true));
+        
+        let yd = 0, yc = 0, yqd = 0, yqc = 0, yfd = 0, yfc = 0;
+        let ySt = p.substring(0,4) + '-01';
+        let ySet = new Set(vsAll.filter(v => v.period >= ySt && v.period <= p && (st === '仅已审' ? v.status === '已审核' : true)).map(v => v.id));
+        
+        esAll.forEach(e => {
+            if (tc.includes(e.accId) && ySet.has(e.voucherId) && (ax ? String(e.auxId) === String(ax) : true)) {
+                yd += e.deb || 0; yc += e.cre || 0;
+                if (t.isQty) { yqd += e.deb > 0 ? (+e.qty || 0) : 0; yqc += e.cre > 0 ? (+e.qty || 0) : 0; }
+                if (t.currency) { yfd += e.deb > 0 ? (+e.fcAmount || 0) : 0; yfc += e.cre > 0 ? (+e.fcAmount || 0) : 0; }
+            }
+        });
+        
+        for (let v of vs) {
+            let ve = es.filter(e => e.voucherId === v.id);
+            for (let e of ve) {
+                let a = accs.find(x => x.id === e.accId);
+                bal += t.direction === '借' ? ((e.deb||0) - (e.cre||0)) : ((e.cre||0) - (e.deb||0));
+                if (e.currency) fcBal += t.direction === '借' ? (e.deb > 0 ? e.fcAmount : -(e.fcAmount || 0)) : (e.cre > 0 ? e.fcAmount : -(e.fcAmount || 0));
+                if (a && a.isQty) qBal += t.direction === '借' ? ((e.deb > 0 ? e.qty : 0) - (e.cre > 0 ? e.qty : 0)) : ((e.cre > 0 ? e.qty : 0) - (e.deb > 0 ? e.qty : 0));
+                
+                let stx = [];
+                if (e.currency) stx.push(`<span style="color:#7e22ce;">外: ${fa(e.fcAmount)} ${e.currency} @${e.excRate}</span>`);
+                if (a && a.isQty && e.qty) stx.push(`<span style="color:#0ea5e9;">量: ${fq(e.qty)} ${a.unit||''} @${fq(e.price||0)}</span>`); 
+                
+                let axs = [];
+                if (e.auxId) axs.push(`<span class="badge gray" style="text-align:left;">${esc(typeof window.getAuxName === 'function' ? window.getAuxName(e.auxId) : e.auxId)}</span>`);
+                if (e.cfItem) axs.push(`<span class="badge green" style="margin-top:2px;text-align:left;">流: ${esc(getCFName(e.cfItem))}</span>`);
+                
+                curData.push({date:v.date, vno:v.vno, vid:v.id, summary:e.summary||'', accName:a?a.name:'', deb:e.deb||null, cre:e.cre||null, dir:t.direction, bal, fcStr:stx.join('<br>'), auxName:axs.join('<br>')});
+            }
+        } 
+        
+        curData.push({date:'', vno:'', vid:null, summary:'本期合计', accName:'', deb:es.reduce((s,e) => s + (e.deb||0), 0), cre:es.reduce((s,e) => s + (e.cre||0), 0), dir:t.direction, bal, fcStr:fmtV(0,fcBal,t.currency,qBal,t.unit).replace('0.00<br>',''), auxName:'', bold:true});
+        
+        let yStr = [];
+        if (t.currency) yStr.push(`<span style="color:#7e22ce;">外: 借${fa(yfd)} 贷${fa(yfc)}</span>`);
+        if (t.isQty) yStr.push(`<span style="color:#0ea5e9;">数: 借${fq(yqd)} 贷${fq(yqc)}</span>`);
+        
+        curData.push({date:'', vno:'', vid:null, summary:'本年累计', accName:'', deb:yd, cre:yc, dir:t.direction, bal, fcStr:yStr.join('<br>'), auxName:'', bold:true});
+        
+        finalHtml += `<tr class="highlight"><td colspan="9" style="background:var(--primary-light); font-weight:bold; font-size: 14px; border-top: 2px solid var(--primary);">科目明细：${t.code} ${typeof getFullAccName === 'function' ? getFullAccName(t.code) : t.name}</td></tr>`;
+        
+        finalHtml += curData.map(r => `
+            <tr class="${r.bold ? 'highlight' : ''}">
+                <td class="tc mono text-xs">${esc(r.date)}</td>
+                <td class="tc bold">${r.vid ? `<a href="javascript:void(0)" onclick="viewVoucher(${r.vid})" class="color-p" style="text-decoration:none;border-bottom:1px dashed currentColor;">${esc(r.vno)}</a>` : esc(r.vno)}</td>
+                <td title="${esc(r.summary)}">${esc(r.summary)}</td>
+                <td>${esc(r.accName)}</td>
+                <td class="tc" style="line-height:1.2;white-space:normal;">${r.auxName || '-'}</td>
+                <td class="tr dr-val" style="vertical-align:top;">${r.deb !== null ? fa(r.deb) : ''}${r.fcStr && !r.bold ? `<br><span class="text-xs" style="font-weight:normal;">${r.fcStr}</span>` : ''}</td>
+                <td class="tr cr-val" style="vertical-align:top;">${r.cre !== null ? fa(r.cre) : ''}${r.fcStr && !r.bold ? `<br><span class="text-xs" style="font-weight:normal;">${r.fcStr}</span>` : ''}</td>
+                <td class="tc color-m">${esc(r.dir)}</td>
+                <td class="tr mono bold color-p" style="font-size:14px;vertical-align:top;">${fa(r.bal)}${r.bold && r.fcStr ? `<br><span class="text-xs" style="font-weight:normal;">${r.fcStr}</span>` : ''}</td>
+            </tr>`).join('');
+    }
+    ge('dlBody').innerHTML = finalHtml || `<tr><td colspan="9" class="tc color-m py-4">未找到相关数据</td></tr>`;
+};
+
+window.exportDlData = function() {
+    let p = ge('dlP')?.value || curPeriod, accText = ge('dlAcc') ? (ge('dlAcc').options[ge('dlAcc').selectedIndex]?.text.trim() || '') : '';
+    exportTableEl(qs('.tbl'), '科目明细账_' + p, [['科目明细账'], [`编制单位：${curBook.name}     科目：${accText}     查询期间：${p}`]]);
+};
+
+
+// -------------------------------------------------------------------------
+// 4. 辅助汇总表 (Auxiliary Summary) - 【已增强：支持按类别筛选】
+// -------------------------------------------------------------------------
+window.pgAuxSummary = async function() {
+    const auxCats = ['客户','供应商','项目部','员工','部门','商品','仓库','成本对象','其他'];
+    ge('pageEl').innerHTML = `
+    <div class="card">
+        <div class="flex-row mb-3 bg-body p-3 no-print" style="padding:12px;border-radius:8px;border:1px solid #cbd5e1;">
+            <input id="asP" type="month" value="${curPeriod}" class="inp" style="width:140px;" onchange="calcAuxSummary()">
+            <select id="asAuxCat" class="sel f1" onchange="calcAuxSummary()">
+                <option value="">全部辅助类别</option>
+                ${auxCats.map(c => `<option value="${c}">${c}</option>`).join('')}
+            </select>
+            <select id="asAux" class="sel f1" onchange="calcAuxSummary()"><option value="">全部辅助核算子目</option>${auxItems.map(x=>`<option value="${x.id}">${esc('['+x.category+'] '+x.code+' '+x.name)}</option>`).join('')}</select>
+            <select id="asAcc" class="sel f1" onchange="calcAuxSummary()"><option value="">全部关联科目</option>${accs.map(a=>`<option value="${a.id}">${a.code} ${esc(a.name)}</option>`).join('')}</select>
+            <button onclick="calcAuxSummary()" class="btn btn-p">查询汇总</button>
+        </div>
+        <div class="table-wrap">
+            <table class="tbl">
+                <thead>
+                    <tr>
+                        <th rowspan="2" class="tc">辅助类别</th><th rowspan="2" class="tc">项目子目编码</th><th rowspan="2" class="tl">项目子目名称</th><th rowspan="2" class="tc">科目编码</th><th rowspan="2" class="tl">科目名称</th>
+                        <th colspan="2" class="tc" style="background:var(--bg-body)">期初余额</th>
+                        <th colspan="2" class="tc" style="background:var(--primary-light)">本期发生额</th>
+                        <th colspan="2" class="tc" style="background:var(--success-light)">期末余额</th>
+                    </tr>
+                    <tr>
+                        <th class="tr" style="background:#f1f5f9;top:36px;">借方</th><th class="tr" style="background:#f1f5f9;top:36px;">贷方</th>
+                        <th class="tr" style="background:#dbeafe;top:36px;">借方</th><th class="tr" style="background:#dbeafe;top:36px;">贷方</th>
+                        <th class="tr" style="background:#dcfce7;top:36px;">借方</th><th class="tr" style="background:#dcfce7;top:36px;">贷方</th>
+                    </tr>
+                </thead>
+                <tbody id="asBody"><tr><td colspan="11" class="tc color-m py-4">点击查询</td></tr></tbody>
+            </table>
+        </div>
+    </div>`;
+};
+
+window.calcAuxSummary = async function() {
+    let p = ge('asP').value, axCat = ge('asAuxCat').value, ax = ge('asAux').value, ac = ge('asAcc').value, av = await dbIdx('vouchers', 'bookId', curBook.id), vM = {};
+    if (!p) return;
+    av.forEach(v => vM[v.id] = v.period);
+    
+    let m = {}, rs = [];
+    (await dbIdx('entries', 'bookId', curBook.id)).forEach(e => {
+        if (!e.auxId) return;
+        let pd = vM[e.voucherId]; if (!pd || pd > p) return;
+        let k = e.auxId + '_' + e.accId;
+        if (!m[k]) m[k] = {auxId: e.auxId, accId: e.accId, bD: 0, bC: 0, pD: 0, pC: 0, eD: 0, eC: 0};
+        
+        if (pd < p) { m[k].bD += (+e.deb || 0); m[k].bC += (+e.cre || 0); }
+        else { m[k].pD += (+e.deb || 0); m[k].pC += (+e.cre || 0); }
+    });
+    
+    Object.values(m).forEach(r => {
+        let x = auxItems.find(y => y.id == r.auxId);
+        if (!x) return;
+        
+        if ((axCat && x.category !== axCat) || (ax && String(r.auxId) !== String(ax)) || (ac && String(r.accId) !== String(ac))) return;
+        
+        let a = accs.find(y => y.id == r.accId);
+        if (!a) return;
+        
+        r.accCode = a.code; r.accName = a.name; r.dir = a.direction; 
+        r.auxCat = x.category; r.auxCode = x.code; r.auxName = x.name;
+        
+        let bn = r.dir === '借' ? (r.bD - r.bC) : (r.bC - r.bD);
+        if (r.dir === '借') { r.bD = Math.max(0, bn); r.bC = Math.max(0, -bn); } else { r.bC = Math.max(0, bn); r.bD = Math.max(0, -bn); }
+        
+        let en = r.dir === '借' ? (r.bD - r.bC + r.pD - r.pC) : (r.bC - r.bD + r.pC - r.pD);
+        if (r.dir === '借') { r.eD = Math.max(0, en); r.eC = Math.max(0, -en); } else { r.eC = Math.max(0, en); r.eD = Math.max(0, -en); }
+        
+        if (r.bD || r.bC || r.pD || r.pC || r.eD || r.eC) rs.push(r);
+    });
+    
+    rs.sort((a, b) => (a.auxCat || '').localeCompare(b.auxCat || '') || (a.auxCode || '').localeCompare(b.auxCode || '') || a.accCode.localeCompare(b.accCode));
+    asData = rs;
+    
+    ge('asBody').innerHTML = rs.length ? rs.map(r => `
+        <tr>
+            <td class="tc"><span class="badge blue">${esc(r.auxCat)}</span></td>
+            <td class="tc mono bold color-p">${esc(r.auxCode)}</td><td class="bold">${esc(r.auxName)}</td>
+            <td class="tc mono">${esc(r.accCode)}</td><td>${esc(r.accName)}</td>
+            <td class="tr mono">${r.bD ? fa(r.bD) : ''}</td><td class="tr mono">${r.bC ? fa(r.bC) : ''}</td>
+            <td class="tr dr-val">${r.pD ? fa(r.pD) : ''}</td><td class="tr cr-val">${r.pC ? fa(r.pC) : ''}</td>
+            <td class="tr mono bold" style="color:var(--primary);">${r.eD ? fa(r.eD) : ''}</td><td class="tr mono bold" style="color:var(--primary);">${r.eC ? fa(r.eC) : ''}</td>
+        </tr>`).join('') : '<tr><td colspan="11" class="tc py-4">无数据</td></tr>';
+};
+
+window.exportAuxSummary = function() {
+    let p = ge('asP')?.value || curPeriod;
+    exportTableEl(qs('.tbl'), '辅助汇总表_' + p, [['辅助汇总表'], [`编制单位：${curBook.name}     期间：${p}`]]);
+};
+
+
+// -------------------------------------------------------------------------
+// 5. 辅助明细表 (Auxiliary Detail)
+// -------------------------------------------------------------------------
+window.pgAuxDetail = async function() {
+    ge('pageEl').innerHTML = `
+    <div class="card">
+        <div class="flex-row mb-3 bg-body p-3 no-print" style="padding:12px;border-radius:8px;border:1px solid #cbd5e1;">
+            <input id="adP" type="month" value="${curPeriod}" class="inp" style="width:140px;" onchange="calcAuxDetail()">
+            <select id="adAux" class="sel f1" onchange="calcAuxDetail()">
+                <option value="">请选择具体的辅助子目</option>
+                ${auxItems.map(x => `<option value="${x.id}">${esc('['+x.category+'] '+x.code+' '+x.name)}</option>`).join('')}
+            </select>
+            <select id="adAcc" class="sel f1" onchange="calcAuxDetail()">
+                <option value="">全部关联科目</option>
+                ${accs.map(a => `<option value="${a.id}">${a.code} ${esc(a.name)}</option>`).join('')}
+            </select>
+            <button onclick="calcAuxDetail()" class="btn btn-p">查询明细</button>
+        </div>
+        <div class="table-wrap">
+            <table class="tbl">
+                <thead>
+                    <tr><th class="tc">日期</th><th class="tc">凭证号</th><th class="tl">摘要</th><th class="tl">会计科目</th><th class="tr">借方发生</th><th class="tr">贷方发生</th><th class="tc">方向</th><th class="tr">余额</th></tr>
+                </thead>
+                <tbody id="adBody"><tr><td colspan="8" class="tc color-m py-4">选择查询</td></tr></tbody>
+            </table>
+        </div>
+    </div>`;
+};
+
+window.calcAuxDetail = async function() {
+    let axId = ge('adAux').value; if (!axId) return;
+    let p = ge('adP').value, acId = ge('adAcc').value, vM = {};
+    (await dbIdx('vouchers', 'bookId', curBook.id)).forEach(v => vM[v.id] = v);
+    
+    let es = (await dbIdx('entries', 'bookId', curBook.id)).filter(e => String(e.auxId) === String(axId) && vM[e.voucherId] && vM[e.voucherId].period <= p && (acId ? String(e.accId) === String(acId) : true));
+    let pes = es.filter(e => vM[e.voucherId].period < p), ces = es.filter(e => vM[e.voucherId].period === p);
+    
+    ces.sort((a, b) => { let va = vM[a.voucherId], vb = vM[b.voucherId]; return va.date.localeCompare(vb.date) || va.vno.localeCompare(vb.vno); });
+    
+    let bd = 0, bc = 0;
+    pes.forEach(e => { bd += +e.deb || 0; bc += +e.cre || 0; });
+    let bal = bd - bc;
+    
+    adData = [{date: '', vno: '', summary: '期初余额', accName: '', deb: null, cre: null, dir: bal >= 0 ? '借' : '贷', bal: Math.abs(bal), bold: true}];
+    
+    ces.forEach(e => {
+        let v = vM[e.voucherId], a = accs.find(x => x.id == e.accId);
+        bal += (+e.deb || 0) - (+e.cre || 0);
+        adData.push({date: v.date, vno: v.vno, summary: e.summary || '', accName: a ? a.code + ' ' + a.name : '', deb: e.deb || null, cre: e.cre || null, dir: bal >= 0 ? '借' : '贷', bal: Math.abs(bal)});
+    });
+    
+    adData.push({date: '', vno: '', summary: '期末余额', accName: '', deb: null, cre: null, dir: bal >= 0 ? '借' : '贷', bal: Math.abs(bal), bold: true});
+    
+    ge('adBody').innerHTML = adData.map(r => `
+        <tr class="${r.bold ? 'highlight' : ''}">
+            <td class="tc text-xs">${esc(r.date)}</td><td class="tc color-p bold">${esc(r.vno)}</td><td title="${esc(r.summary)}">${esc(r.summary)}</td>
+            <td>${esc(r.accName)}</td><td class="tr dr-val">${r.deb ? fa(r.deb) : ''}</td><td class="tr cr-val">${r.cre ? fa(r.cre) : ''}</td>
+            <td class="tc color-m">${r.dir}</td><td class="tr mono bold color-p" style="font-size:14px;">${fa(r.bal)}</td>
+        </tr>`).join('');
+};
+
+window.exportAuxDetail = function() {
+    let p = ge('adP')?.value || curPeriod;
+    exportTableEl(qs('.tbl'), '辅助明细账_' + p, [['辅助明细账'], [`编制单位：${curBook.name}     期间：${p}`]]);
+};
+</script>

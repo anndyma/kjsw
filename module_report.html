@@ -1,0 +1,349 @@
+<script>
+// =========================================================================
+// 模块三：财务报表 (动态沙箱解析引擎、资产负债表、利润表、现金流量表)
+// =========================================================================
+
+// -------------------------------------------------------------------------
+// 1. 核心沙箱算力：报表上下文生成引擎 (提取余额、发生额、现金流)
+// -------------------------------------------------------------------------
+window.getCombinedRepCtx = async function(p) {
+    let ctx = {
+        M:()=>0, MB:()=>0, C:()=>0, D:()=>0, CY:()=>0, DY:()=>0, 
+        DR:()=>0, CR:()=>0, DRY:()=>0, CRY:()=>0, PM:()=>0, PMB:()=>0,
+        CFI:()=>0, CFO:()=>0, CFY_I:()=>0, CFY_O:()=>0, CF:()=>0, CFY:()=>0
+    };
+    
+    let av = await window.dbIdx('vouchers', 'bookId', curBook.id);
+    let esAll = await window.dbIdx('entries', 'bookId', curBook.id);
+
+    let yr = p.substring(0, 4);
+    let sYr = yr + '-01';
+    let pStart = (yr - 1) + '-12';
+
+    // 过滤出所有已审核的凭证
+    let vM = {};
+    av.forEach(v => { if (v.status === '已审核') vM[v.id] = v; });
+
+    let em = {}, bm = {}, cm = {}, ym = {};
+    let cf_m_in = {}, cf_m_out = {}, cf_y_in = {}, cf_y_out = {};
+
+    // 初始化底层账本结构
+    accs.forEach(a => {
+        em[a.id] = {code: a.code, bal: a.initBal || 0, dir: a.direction};
+        bm[a.id] = {code: a.code, bal: a.initBal || 0, dir: a.direction};
+        cm[a.id] = {code: a.code, deb: 0, cre: 0};
+        ym[a.id] = {code: a.code, deb: 0, cre: 0};
+    });
+
+    esAll.forEach(e => {
+        let v = vM[e.voucherId];
+        if (!v) return;
+
+        let a = accs.find(x => x.id == e.accId);
+        if (!a) return;
+
+        // 【核心修复与强化】：智能识别并拦截期末结转凭证！
+        // 利润表（发生额）必须严格排除期末结转损益的凭证，否则结账后该科目的发生净额会被系统轧平为0。
+        let isPLTransfer = e.summary && (e.summary.includes('结转本期损益') || e.summary.includes('结转本期净') || e.summary.includes('归集本期利润'));
+
+        let d = e.deb || 0;
+        let c = e.cre || 0;
+
+        // 【资产负债表】期末余额 (em): 包含截止到当前期间的所有凭证（必须含结转凭证，以反映真实的清零后状态）
+        if (v.period <= p) {
+            if (a.direction === '借') em[a.id].bal += (d - c);
+            else em[a.id].bal += (c - d);
+        }
+
+        // 【资产负债表】年初余额 (bm): 包含截止到去年12月的所有凭证
+        if (v.period <= pStart) {
+            if (a.direction === '借') bm[a.id].bal += (d - c);
+            else bm[a.id].bal += (c - d);
+        }
+
+        // 【利润表/现金流】本期发生 (cm): 严格限定在当前期间，且必须剔除期末结转干扰！
+        if (v.period === p && !isPLTransfer) {
+            cm[a.id].deb += d;
+            cm[a.id].cre += c;
+
+            if (e.cfItem) {
+                if (d > 0) cf_m_in[e.cfItem] = (cf_m_in[e.cfItem] || 0) + d;
+                if (c > 0) cf_m_out[e.cfItem] = (cf_m_out[e.cfItem] || 0) + c;
+            }
+        }
+
+        // 【利润表/现金流】本年累计发生 (ym): 从本年1月贯穿至当前期间，且必须剔除期末结转干扰！
+        if (v.period >= sYr && v.period <= p && !isPLTransfer) {
+            ym[a.id].deb += d;
+            ym[a.id].cre += c;
+
+            if (e.cfItem) {
+                if (d > 0) cf_y_in[e.cfItem] = (cf_y_in[e.cfItem] || 0) + d;
+                if (c > 0) cf_y_out[e.cfItem] = (cf_y_out[e.cfItem] || 0) + c;
+            }
+        }
+    });
+
+    // 【资产负债表动态推演补丁】：如果当前期间尚未结账，资产负债表无法取到真实的本年利润余额，需在沙箱中虚拟推演
+    let pm = 0;
+    let isClosed = (await window.dbIdx('closings', 'bookId', curBook.id)).some(cl => cl.period === p);
+    if (!isClosed) {
+        let sy = curBook.sysAccs || DEFAULT_SYS_ACCS;
+        let pxs = (sy.profitPrefix || '').split(',');
+        esAll.forEach(e => {
+            let v = vM[e.voucherId];
+            if(v && v.period >= sYr && v.period <= p) {
+                let a = accs.find(x => x.id == e.accId);
+                if (a && pxs.some(x => x && a.code.startsWith(x))) {
+                    // 损益类科目：贷方代表收入增加利润，借方代表费用减少利润
+                    pm += (e.cre || 0) - (e.deb || 0); 
+                }
+            }
+        });
+    }
+
+    const _s = (m, px) => { let v=0; for(let k in m) if(m[k].code && m[k].code.startsWith(px)) v += m[k].bal||0; return v; };
+    const _o = (m, px, ic) => { let v=0; for(let k in m) if(m[k].code && m[k].code.startsWith(px)) v += ic ? ((m[k].cre||0)-(m[k].deb||0)) : ((m[k].deb||0)-(m[k].cre||0)); return v; };
+    const _sc = (m, px, ic) => { let v=0; for(let k in m) if(m[k].code && m[k].code.startsWith(px)) v += ic ? (m[k].cre||0) : (m[k].deb||0); return v; };
+
+    // 将账本数据注入沙箱公式上下文
+    ctx.M = x => _s(em, x); ctx.MB = x => _s(bm, x); ctx.PM = () => pm;
+    ctx.C = x => _o(cm, x, true); ctx.D = x => _o(cm, x, false);
+    ctx.CY = x => _o(ym, x, true); ctx.DY = x => _o(ym, x, false);
+    ctx.DR = x => _sc(cm, x, false); ctx.CR = x => _sc(cm, x, true);
+    ctx.DRY = x => _sc(ym, x, false); ctx.CRY = x => _sc(ym, x, true);
+
+    ctx.CFI = x => cf_m_in[x] || 0; ctx.CFO = x => cf_m_out[x] || 0; 
+    ctx.CFY_I = x => cf_y_in[x] || 0; ctx.CFY_O = x => cf_y_out[x] || 0; 
+    ctx.CF = x => (cf_m_in[x] || 0) + (cf_m_out[x] || 0); 
+    ctx.CFY = x => (cf_y_in[x] || 0) + (cf_y_out[x] || 0);
+    
+    return ctx;
+};
+
+// 安全沙箱解析执行器
+window.evalF = function(f, ctx) {
+    try { return new Function(...Object.keys(ctx), "return " + f)(...Object.values(ctx)) || 0; } 
+    catch(e) { return 0; }
+};
+
+
+// -------------------------------------------------------------------------
+// 2. 报表增删与基础管理
+// -------------------------------------------------------------------------
+window.createNewReport = function() {
+    let n = prompt('新报表名称：'); if (!n) return;
+    let k = 'custom_' + Date.now();
+    curBook.reports[k] = {title: n, data: [{n: '新建项目', f: '', fb: ''}]};
+    window.dbPut('books', curBook).then(() => { window.buildMenu(); window.goMenu('report-' + k); });
+};
+
+window.deleteReport = function(id) {
+    if (['bs', 'is', 'cf'].includes(id)) return alert('内置三大主表不可删除！');
+    if (confirm('彻底删除此自定义报表？不可恢复！')) {
+        delete curBook.reports[id];
+        window.dbPut('books', curBook).then(() => { window.buildMenu(); window.goMenu('dashboard'); });
+    }
+};
+
+window.exportCustomReport = function(id) {
+    window.exportTableEl(window.ge('repTblMaster'), `${curBook.reports[id].title}_${window.ge('repP').value}`, [[curBook.reports[id].title], [`编制单位：${curBook.name}     期间：${window.ge('repP').value}     单位：元`]]);
+};
+
+
+// -------------------------------------------------------------------------
+// 3. 动态报表主界面与运算渲染 (UI)
+// -------------------------------------------------------------------------
+window.pgDynamicReport = async function(id) {
+    let ro = curBook.reports[id]; if (!ro) return;
+
+    // 【热修复补丁 Auto-Healing】：自动检测并纠正历史版本中遗留的利润表公式置反Bug
+    let needsSave = false;
+    if (id === 'is' || ro.title.includes('利润')) {
+        ro.data.forEach(r => {
+            // 如果“本期公式(f)”里存的是本年累计(CY/DY) ，而“本年公式(fb)”里存的是本期(C/D)，说明反了，需要互换修正。
+            if (r.f && (r.f.includes('CY(') || r.f.includes('DY(')) && r.fb && (!r.fb.includes('CY(') && !r.fb.includes('DY('))) {
+                let tmp = r.f; r.f = r.fb; r.fb = tmp;
+                needsSave = true;
+            }
+        });
+        if (needsSave) await window.dbPut('books', curBook); // 静默保存修复结果到数据库
+    }
+
+    let isD = ro.data.some(r => +r.col === 2);
+    let isB = id === 'bs' || ro.title.includes('资产负债');
+    let h1 = isB ? '资 产' : '项 目', h2 = isB ? '负债和所有者权益' : '项 目';
+    let v1 = isB ? '期末余额' : '本期金额', v2 = isB ? '年初余额' : '本年累计';
+    
+    let h = `
+    <div class="card" style="max-width:${isD ? '100%' : '900px'};margin:0 auto;box-shadow:none;border:none;padding:10px 20px;">
+        <div id="printReportHeader">
+            <div class="tc mb-4"><h2 style="font-size:26px;font-weight:800;letter-spacing:4px;margin-bottom:12px;">${window.esc(ro.title)}</h2></div>
+            <div class="flex-between mb-3" style="color:var(--text-main);font-size:13px;font-weight:600;padding:0 4px;">
+                <span>编制单位：${window.esc(curBook.name)}</span>
+                <span style="display:flex;align-items:center;gap:4px;">期间：<input id="repP" type="month" value="${curPeriod}" class="inp" style="width:130px;padding:2px 8px;font-weight:bold;height:auto;" onchange="window.calcDynamicReport('${id}')"></span>
+                <span>单位：元</span>
+            </div>
+        </div>
+        <div class="table-wrap" style="overflow:visible;max-height:none;border:none;box-shadow:none;">
+            <table class="rep-tbl" id="repTblMaster">
+                <thead><tr>` + (isD ? `<th class="tl" style="width:26%;">${h1}</th><th class="tr" style="width:12%;">${v1}</th><th class="tr" style="width:12%;border-right:2px solid #64748b;">${v2}</th><th class="tl" style="width:26%;">${h2}</th><th class="tr" style="width:12%;">${v1}</th><th class="tr" style="width:12%;">${v2}</th>` : `<th class="tl">${h1}</th><th class="tr" style="width:20%;">${v1}</th><th class="tr" style="width:20%;">${v2}</th>`) + `</tr></thead>
+                <tbody id="repBody"><tr><td colspan="6" class="tc color-m py-4">计算中，请稍候...</td></tr></tbody>
+            </table>
+        </div>
+    </div>`;
+    
+    window.ge('pageEl').innerHTML = h;
+    setTimeout(() => window.calcDynamicReport(id), 50);
+};
+
+window.calcDynamicReport = async function(id) {
+    let p = window.ge('repP').value, ro = curBook.reports[id]; if (!p || !ro) return;
+    let ctx = await window.getCombinedRepCtx(p);
+    let isD = ro.data.some(r => +r.col === 2), c1 = [], c2 = [];
+    
+    ro.data.forEach(r => {
+        let v1 = r.f ? window.evalF(r.f, ctx) : '', af = '';
+        if (r.f) {
+            // 自动推断年初或本年累计公式（如果报表中未手动指定）
+            if (r.f.includes('M(') || r.f.includes('PM(')) af = r.f.replace(/\bM\(/g, 'MB(').replace(/\bPM\(/g, 'PMB(');
+            else af = r.f.replace(/\bDR\(/g, 'DRY(').replace(/\bCR\(/g, 'CRY(').replace(/\bC\(/g, 'CY(').replace(/\bD\(/g, 'DY(').replace(/\bCFI\(/g, 'CFY_I(').replace(/\bCFO\(/g, 'CFY_O(');
+        }
+        let v2 = (r.fb || r.fy) ? window.evalF(r.fb || r.fy, ctx) : (af ? window.evalF(af, ctx) : '');
+        let obj = {n: r.n, v1: r.f ? window.fa(v1) : '', v2: (r.f || r.fb || r.fy) ? window.fa(v2) : '', isT: r.isT, isH: r.isH};
+        if (+r.col === 2) c2.push(obj); else c1.push(obj);
+    });
+    
+    const bc = (o, l) => {
+        let br = l ? 'border-right:2px solid #64748b;' : '';
+        if (!o) return `<td style="border-right:1px solid #cbd5e1;"></td><td style="border-right:1px solid #cbd5e1;"></td><td style="${br}"></td>`;
+        let fw = o.isT || o.isH ? 'font-weight:bold;' : '';
+        let bg = o.isT ? 'background:var(--bg-body);color:var(--primary);' : (o.isH ? 'background:#f8fafc;' : '');
+        let pl = o.isT || o.isH ? '12px' : '28px';
+        return `<td style="padding-left:${pl};${fw}${bg}border-right:1px solid #cbd5e1;">${window.esc(o.n)}</td><td class="tr mono" style="${fw}${bg}border-right:1px solid #cbd5e1;">${o.v1}</td><td class="tr mono color-m" style="${fw}${bg}${br}">${o.v2}</td>`;
+    };
+    
+    let h = '';
+    if (isD) {
+        let mx = Math.max(c1.length, c2.length);
+        for (let i = 0; i < mx; i++) h += `<tr class="${c1[i]?.isT || c2[i]?.isT ? 'highlight' : ''}">${bc(c1[i], true)}${bc(c2[i], false)}</tr>`;
+    } else {
+        c1.forEach(o => h += `<tr class="${o.isT ? 'highlight' : ''}">${bc(o, false)}</tr>`);
+    }
+    window.ge('repBody').innerHTML = h;
+};
+
+
+// -------------------------------------------------------------------------
+// 4. 公式编辑器组件 (支持实时修改与 CSV 导入导出配置)
+// -------------------------------------------------------------------------
+window.editReportFormulas = function(id) {
+    let ro = curBook.reports[id]; if (!ro) return;
+    let h = `
+    <div class="alert alert-info"><b>💻 动态公式引擎说明：</b><br><code>M('科目代码')</code>=期末余额, <code>MB()</code>=年初, <code>C()</code>=贷方净额, <code>D()</code>=借方净额, <code>PM()</code>=未结利润。<br><code>DR()</code>=借方发生, <code>CR()</code>=贷方发生。<b><code>CFI('项目号')</code>=该项流入现金, <code>CFO('项目号')</code>=流出现金</b>。支持原生 JS 加减乘除。</div>
+    <div class="flex-row mb-3"><input id="repTInp" class="inp f1 bold color-p" value="${window.esc(ro.title)}"></div>
+    <div class="flex-row mb-3 bg-body p-2 no-print" style="padding:10px;border-radius:8px;border:1px solid #cbd5e1;">
+        <button onclick="window.exportReportCSV('${id}')" class="btn btn-n">📥 导出配置(CSV)</button>
+        <button onclick="window.ge('iRCsv').click()" class="btn btn-i ml-2">📤 导入配置</button>
+        <input type="file" id="iRCsv" accept=".csv" class="hidden" onchange="window.importReportCSV(this,'${id}')">
+        <button onclick="window.resetReport('${id}')" class="btn btn-text danger ml-auto">重置为系统默认</button>
+        <button onclick="window.addReportRow()" class="btn btn-p ml-2">➕ 新增一行</button>
+    </div>
+    <div class="table-wrap" style="max-height:400px;">
+        <table class="tbl">
+            <thead><tr><th>项目名称</th><th>本期/期末公式</th><th>本年/年初公式</th><th style="width:50px;">加粗</th><th style="width:70px;">显示列</th><th style="width:50px;">操作</th></tr></thead>
+            <tbody id="reB"></tbody>
+        </table>
+    </div>`;
+    
+    window.openDlg('⚙️ 公式配置中心', h, async () => {
+        let nd = [];
+        window.qsa('#reB tr').forEach(tr => {
+            let n = tr.querySelector('.i-n').value.trim(); if (!n) return;
+            let o = {n}, f = tr.querySelector('.i-f').value.trim(), fb = tr.querySelector('.i-fb').value.trim();
+            if (f) o.f = f; if (fb) o.fb = fb;
+            if (tr.querySelector('.i-ist').checked) o.isT = 1;
+            if (tr.querySelector('.i-col').value === '2') o.col = 2;
+            nd.push(o);
+        });
+        ro.title = window.ge('repTInp').value.trim() || ro.title;
+        ro.data = nd;
+        await window.dbPut('books', curBook);
+        alert('保存成功！底层报表结构已更新。');
+        window.buildMenu(); window.closeDlg(); window.calcDynamicReport(id);
+    });
+    
+    setTimeout(() => window.rrB(ro.data), 10);
+};
+
+window.rrB = function(d) {
+    window.ge('reB').innerHTML = d.map(r => `
+    <tr>
+        <td class="v-input-cell"><input class="v-inp i-n" value="${window.esc(r.n)}"></td>
+        <td class="v-input-cell"><input class="v-inp mono color-p i-f" value="${window.esc(r.f||'')}"></td>
+        <td class="v-input-cell"><input class="v-inp mono color-p i-fb" value="${window.esc(r.fb||r.fy||'')}"></td>
+        <td class="tc"><input type="checkbox" class="i-ist" ${r.isT?'checked':''}></td>
+        <td class="v-input-cell"><select class="v-inp i-col"><option value="1">左位</option><option value="2" ${+r.col===2?'selected':''}>右位</option></select></td>
+        <td class="tc"><button onclick="this.closest('tr').remove()" class="btn btn-text danger text-xs">删除</button></td>
+    </tr>`).join('');
+};
+
+window.addReportRow = function() {
+    let tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td class="v-input-cell"><input class="v-inp i-n" value="新项目"></td>
+        <td class="v-input-cell"><input class="v-inp mono color-p i-f"></td>
+        <td class="v-input-cell"><input class="v-inp mono color-p i-fb"></td>
+        <td class="tc"><input type="checkbox" class="i-ist"></td>
+        <td class="v-input-cell"><select class="v-inp i-col"><option value="1">左位</option><option value="2">右位</option></select></td>
+        <td class="tc"><button onclick="this.closest('tr').remove()" class="btn btn-text danger text-xs">删除</button></td>`;
+    window.ge('reB').appendChild(tr);
+};
+
+window.resetReport = function(id) {
+    if (confirm('警告：此操作将清空您修改的所有公式，恢复至系统默认状态。确认继续？')) {
+        window.rrB(DEFAULT_REPORTS[id] ? JSON.parse(JSON.stringify(DEFAULT_REPORTS[id].data)) : []);
+    }
+};
+
+window.exportReportCSV = function(id) {
+    let d = [];
+    window.qsa('#reB tr').forEach(tr => {
+        let n = tr.querySelector('.i-n')?.value.trim();
+        if (n) {
+            let o = {n}, f = tr.querySelector('.i-f').value.trim(), fb = tr.querySelector('.i-fb').value.trim();
+            if (f) o.f = f; if (fb) o.fb = fb;
+            if (tr.querySelector('.i-ist').checked) o.isT = 1;
+            if (tr.querySelector('.i-col').value === '2') o.col = 2;
+            d.push(o);
+        }
+    });
+    if (!d.length) d = curBook.reports[id].data;
+    let r = [['项目名称', '本期/期末公式', '本年/年初公式', '加粗(1/0)', '显示列(1左/2右)']];
+    d.forEach(x => r.push([x.n, x.f || '', x.fb || x.fy || '', x.isT ? 1 : 0, x.col || 1]));
+    window.exportAOA(r, '公式设置备份_' + id);
+};
+
+window.importReportCSV = function(i, id) {
+    let f = i.files[0]; if (!f) return;
+    let r = new FileReader();
+    r.onload = e => {
+        try {
+            let ls = window.parseCSV(e.target.result), nr = [];
+            for (let j = 1; j < ls.length; j++) {
+                let w = ls[j]; if (w.length < 1 || !w[0].trim()) continue;
+                let o = {n: w[0].trim()};
+                if (w[1]?.trim()) o.f = w[1].trim();
+                if (w[2]?.trim()) o.fb = w[2].trim();
+                if (w[3]?.trim() === '1' || w[3]?.trim() === '是') o.isT = 1;
+                if (w[4]?.trim() === '2' || w[4]?.trim() === '右') o.col = 2;
+                nr.push(o);
+            }
+            if (window.rrB) window.rrB(nr);
+            alert('配置加载成功，请预览确认无误后点击配置中心右下角【保存确认】！');
+        } catch (err) { alert('CSV格式解析错误，请检查。'); }
+        i.value = '';
+    };
+    r.readAsText(f, 'UTF-8');
+};
+</script>

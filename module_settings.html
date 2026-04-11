@@ -1,0 +1,758 @@
+<script>
+// =========================================================================
+// 模块四：基础设置与系统管理 (期初、科目、辅助、结账、容灾备份)
+// =========================================================================
+
+// ----------------辅助核算锁定校验辅助函数---------------------
+window.checkAuxHasData = async function(auxId) {
+    if (!auxId) return false;
+    let es = await window.dbIdx('entries', 'bookId', curBook.id);
+    return es.some(e => String(e.auxId) === String(auxId));
+};
+
+// -------------------------------------------------------------------------
+// 1. 期初余额录入 (Initial Balance)
+// -------------------------------------------------------------------------
+window.pgInitBal = async function() {
+    let ds = (await dbIdx('closings', 'bookId', curBook.id)).length > 0 ? 'disabled' : '';
+    let lvs = {}; 
+    accs.forEach(a => { if(isLeafAcc(a.code)) lvs[a.code] = true; });
+    
+    ge('pageEl').innerHTML = `
+    <div class="card">
+        <div class="flex-between mb-3">
+            <div class="ctitle" style="margin:0;border:none;font-size:18px;">期初余额录入</div>
+            <button onclick="saveInitBal()" class="btn btn-p" ${ds}>保存期初余额 (Ctrl+Enter)</button>
+        </div>
+        <div class="alert alert-info">仅允许在末级科目录入。开启了存货数量或外币的科目，将自动呈现专属参数输入框。修改后请注意下方试算平衡状态。</div>
+        <div class="flex-row mb-3 bg-body" style="padding:16px;border-radius:8px;border:1px solid #cbd5e1;box-shadow:inset 0 1px 3px rgba(0,0,0,0.05);">
+            <div style="flex:1;"><span class="bold color-m">借方合计：</span><span id="iDT" class="mono color-p" style="font-size:20px;">0.00</span></div>
+            <div style="flex:1;"><span class="bold color-m">贷方合计：</span><span id="iCT" class="mono color-d" style="font-size:20px;">0.00</span></div>
+            <div id="iDf" class="bold" style="font-size:16px;flex:1;text-align:right;"></div>
+        </div>
+        <div class="table-wrap">
+            <table class="tbl">
+                <thead><tr><th style="width:140px;">科目编码</th><th class="tl">科目名称</th><th class="tc" style="width:60px;">方向</th><th class="tc" style="width:240px;">期初余额配置 (数量/外币/本位币)</th></tr></thead>
+                <tbody id="ibBody"></tbody>
+            </table>
+        </div>
+    </div>`;
+    
+    ge('ibBody').innerHTML = accs.map(a => {
+        let il = lvs[a.code], pd = (a.code.length - 4) * 14, pf = a.code.length > 4 ? '<span style="color:#cbd5e1;margin-right:4px;">└─</span>' : '';
+        let ip = il ? `<div style="display:flex;flex-direction:column;gap:4px;">
+            ${a.isQty ? `<input type="number" class="v-inp mono ib-qinp tr" data-id="${a.id}" value="${a.initQty||''}" placeholder="数量(${esc(a.unit||'')})" ${ds} style="background:var(--primary-light);color:#0ea5e9;border-radius:4px;border:1px solid #7dd3fc;">` : ''}
+            ${a.currency ? `<input type="number" class="v-inp mono ib-fcinp tr" data-id="${a.id}" value="${a.initFcBal||''}" placeholder="外币金额" oninput="sIF(this)" onblur="this.value=parseFloat(this.value||0).toFixed(2)" ${ds} style="background:var(--primary-light);color:#7e22ce;border-radius:4px;border:1px solid #c084fc;">` : ''}
+            <input type="number" class="v-inp mono ib-inp tr" data-id="${a.id}" data-dir="${a.direction}" data-code="${a.code}" value="${a.initBal||''}" placeholder="本位币金额" oninput="cIT()" onblur="this.value=parseFloat(this.value||0).toFixed(2)" ${ds} style="border:1px solid #cbd5e1;border-radius:4px;">
+        </div>` : `<span id="i_s_${a.code}" class="mono bold color-p">0.00</span>`;
+        
+        return `<tr class="${il ? '' : 'highlight'}">
+            <td class="tc mono bold ${il ? '' : 'color-p'}">${a.code}</td>
+            <td style="padding-left:${12 + pd}px;">${pf}${esc(a.name)} ${a.currency?`<span class="badge purple ml-2">${a.currency}</span>`:''} ${a.isQty?`<span class="badge blue ml-1">量</span>`:''}</td>
+            <td class="tc color-m">${a.direction}</td>
+            <td class="v-input-cell" style="padding:6px!important;vertical-align:top;">${ip}</td>
+        </tr>`;
+    }).join('');
+    
+    cIT();
+};
+
+window.sIF = function(el) {
+    let a = accs.find(x => x.id == el.dataset.id), c = currencies.find(x => x.code === a.currency), r = c ? c.rate : 1;
+    let ip = el.parentElement.querySelector('.ib-inp');
+    if (ip) { ip.value = ((+el.value || 0) * r).toFixed(2); cIT(); }
+};
+
+window.cIT = function() {
+    let d = 0, c = 0, s = {};
+    qsa('.ib-inp').forEach(ip => {
+        let v = +ip.value || 0, cd = ip.dataset.code;
+        if (ip.dataset.dir === '借') d += v; else c += v;
+        for (let i = 4; i <= cd.length; i += 2) s[cd.substring(0, i)] = (s[cd.substring(0, i)] || 0) + v;
+    });
+    ge('iDT').textContent = fa(d); ge('iCT').textContent = fa(c);
+    let df = ge('iDf');
+    if (Math.abs(d - c) < 0.001) {
+        df.textContent = '✓ 试算平衡'; df.style.color = 'var(--success)';
+    } else {
+        df.textContent = '✗ 不平差额: ' + fa(Math.abs(d - c)); df.style.color = 'var(--danger)';
+    }
+    for (let k in s) { let el = ge('i_s_' + k); if (el) el.textContent = fa(s[k]); }
+};
+
+window.saveInitBal = async function() {
+    let u = [], d = 0, c = 0;
+    qsa('#ibBody tr').forEach(tr => {
+        let ip = tr.querySelector('.ib-inp'), fp = tr.querySelector('.ib-fcinp'), qp = tr.querySelector('.ib-qinp');
+        if (ip) {
+            let v = +ip.value || 0, id = +ip.dataset.id;
+            if (ip.dataset.dir === '借') d += v; else c += v;
+            let o = {id, val: v};
+            if (fp) o.fcVal = +fp.value || 0;
+            if (qp) o.initQty = +qp.value || 0;
+            u.push(o);
+        }
+    });
+    if (Math.abs(d - c) > 0.001) return alert('保存失败：借贷必须完全平衡');
+    
+    for (let x of u) {
+        let a = accs.find(y => y.id === x.id);
+        if (a && (a.initBal !== x.val || a.initFcBal !== x.fcVal || a.initQty !== x.initQty)) {
+            a.initBal = x.val;
+            if ('fcVal' in x) a.initFcBal = x.fcVal;
+            if ('initQty' in x) a.initQty = x.initQty;
+            await dbPut('subjects', a);
+        }
+    }
+    alert('保存成功！期初余额已更新。');
+    accs = (await dbIdx('subjects', 'bookId', curBook.id)).sort((a, b) => a.code.localeCompare(b.code));
+};
+
+// -------------------------------------------------------------------------
+// 2. 多币种与汇率维护 (Currencies)
+// -------------------------------------------------------------------------
+window.pgCurrency = async function() {
+    ge('pageEl').innerHTML = `
+    <div class="card">
+        <div class="flex-row mb-3"><button onclick="showCurDlg()" class="btn btn-p">➕ 新增币别</button></div>
+        <div class="table-wrap">
+            <table class="tbl">
+                <thead><tr><th class="tc">代码</th><th class="tl">名称</th><th class="tc">记账汇率</th><th class="tc">操作</th></tr></thead>
+                <tbody id="curBody"></tbody>
+            </table>
+        </div>
+    </div>`;
+    loadCurBody();
+};
+
+window.loadCurBody = async function() {
+    currencies = await dbIdx('currencies', 'bookId', curBook.id);
+    ge('curBody').innerHTML = currencies.length ? currencies.map(c => `
+        <tr><td class="tc mono bold color-p">${esc(c.code)}</td><td class="bold">${esc(c.name)}</td><td class="tc mono">${c.rate}</td>
+        <td class="tc"><button onclick="showCurDlg(${c.id})" class="btn btn-n text-xs mr-2">编辑</button><button onclick="delCur(${c.id})" class="btn btn-text danger text-xs">删除</button></td></tr>
+    `).join('') : '<tr><td colspan="4" class="tc color-m py-4">无外币配置</td></tr>';
+};
+
+window.showCurDlg = function(id) {
+    let c = id ? currencies.find(x => x.id === id) : null;
+    openDlg(c ? '编辑币别' : '新增币别', `
+        <div class="mb-3"><label>代码 (如 USD)</label><input id="fcCode" class="inp" value="${c ? c.code : ''}"></div>
+        <div class="mb-3"><label>名称 (如 美元)</label><input id="fcName" class="inp" value="${c ? c.name : ''}"></div>
+        <div class="mb-3"><label>默认记账汇率</label><input id="fcRate" type="number" step="0.0001" class="inp mono" value="${c ? c.rate : '1.0000'}"></div>
+    `, async () => {
+        let d = {code: ge('fcCode').value.trim().toUpperCase(), name: ge('fcName').value.trim(), rate: +ge('fcRate').value || 1, bookId: curBook.id};
+        if (!d.code || !d.name) return alert('请输入完整的代码和名称');
+        if (c) d.id = c.id;
+        await (c ? dbPut('currencies', d) : dbAdd('currencies', d));
+        closeDlg(); loadCurBody();
+    });
+};
+
+window.delCur = async function(id) {
+    if (accs.some(a => a.currency === currencies.find(c => c.id === id)?.code)) return alert('该币别已绑定相关科目，无法直接删除！请先取消科目绑定。');
+    if (confirm('确认彻底删除该币别？')) { await dbDel('currencies', id); loadCurBody(); }
+};
+
+// -------------------------------------------------------------------------
+// 3. 辅助核算字典 (Auxiliary)
+// -------------------------------------------------------------------------
+window.pgAuxiliary = async function() {
+    ge('pageEl').innerHTML = `
+    <div class="card">
+        <div class="flex-row mb-3"><button onclick="showAuxDlg()" class="btn btn-p">➕ 新增辅助项目子目</button></div>
+        <div class="alert alert-info">请在此维护各辅助核算类别的具体子项目（如具体的客户名称、员工姓名等）。系统严格控制：子目必须归属到具体的类别中，关联会计科目的操作请在【会计科目】设置中完成。</div>
+        <div class="table-wrap">
+            <table class="tbl"><thead><tr><th class="tc">所属类别</th><th class="tc">项目子目编码</th><th class="tl">项目子目名称</th><th class="tc">操作</th></tr></thead><tbody id="auxBody"></tbody>
+            </table>
+        </div>
+    </div>`;
+    loadAuxBody();
+};
+
+window.loadAuxBody = async function() {
+    auxItems = await dbIdx('auxItems', 'bookId', curBook.id);
+    auxItems.sort((a, b) => (a.category || '').localeCompare(b.category || '') || (a.code || '').localeCompare(b.code || ''));
+    ge('auxBody').innerHTML = auxItems.length ? auxItems.map(x => `
+        <tr><td class="tc"><span class="badge blue" style="font-size:12px;padding:4px 8px;">${esc(x.category)}</span></td><td class="tc mono bold color-p">${esc(x.code)}</td><td class="bold">${esc(x.name)}</td>
+        <td class="tc"><button onclick="showAuxDlg(${x.id})" class="btn btn-n text-xs mr-2">编辑</button><button onclick="delAux(${x.id})" class="btn btn-text danger text-xs">删除</button></td></tr>
+    `).join('') : '<tr><td colspan="4" class="tc color-m py-4">暂无辅助核算子目数据</td></tr>';
+};
+
+window.showAuxDlg = async function(id) {
+    let x = id ? auxItems.find(a => a.id === id) : null;
+    let hasData = x ? await checkAuxHasData(x.id) : false;
+    const auxCats = ['客户','供应商','项目部','员工','部门','商品','仓库','成本对象','其他'];
+
+    openDlg(x ? '编辑辅助子目' : '新增辅助子目', `
+        ${hasData ? '<div class="alert alert-warn" style="margin-bottom:12px;padding:8px 12px;">⚠️ 该辅助项目子目已挂接业务凭证发生数据，核心属性全部锁定禁止修改。如需修改，请先撤销或删除关联的凭证。</div>' : ''}
+        <div class="mb-3"><label>所属类别 * (必选)</label>
+            <select id="fCat" class="sel" ${hasData ? 'disabled' : ''}>
+                ${auxCats.map(c => `<option ${x && x.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+            </select>
+        </div>
+        <div class="mb-3"><label>子目编码 *</label><input id="fCode" class="inp" value="${esc(x ? x.code : '')}" placeholder="如：001" ${hasData ? 'disabled' : ''}></div>
+        <div class="mb-3"><label>子目名称 *</label><input id="fName" class="inp" value="${esc(x ? x.name : '')}" placeholder="如：张三 / 某某公司" ${hasData ? 'disabled' : ''}></div>
+    `, async () => {
+        let d = {code: ge('fCode').value.trim(), name: ge('fName').value.trim(), category: ge('fCat').value, bookId: curBook.id};
+        if (!d.code || !d.name) return alert('请完整填写编码和名称');
+        if (x) { d.id = x.id; await dbPut('auxItems', d); } else await dbAdd('auxItems', d);
+        closeDlg(); loadAuxBody();
+    });
+};
+
+window.delAux = async function(id) { 
+    if (await checkAuxHasData(id)) return alert('【强制拦截】该辅助项目子目已发生凭证业务数据，系统禁止删除！如必须删除，请先找出并删除关联了该子目的所有会计凭证。');
+    if (confirm('确认彻底删除此辅助项子目？')) { await dbDel('auxItems', id); loadAuxBody(); } 
+};
+
+// -------------------------------------------------------------------------
+// 4. 会计科目体系配置 (Accounts)
+// -------------------------------------------------------------------------
+window.pgAccounts = async function() {
+    ge('pageEl').innerHTML = `<div class="card"><div class="flex-row mb-3"><button onclick="showAccDlg()" class="btn btn-p">➕ 新增一级科目</button></div><div class="table-wrap"><table class="tbl"><thead><tr><th class="tl" style="padding-left:16px;">科目编码及名称</th><th class="tc">方向</th><th class="tc">类别</th><th class="tc">关联辅助类别</th><th class="tc">数量核算</th><th class="tc">外币核算</th><th class="tc" style="width:160px;">操作</th></tr></thead><tbody id="accBody"></tbody></table></div></div>`;
+    loadAccBody();
+};
+
+window.loadAccBody = async function() {
+    accs = (await dbIdx('subjects', 'bookId', curBook.id)).sort((a, b) => a.code.localeCompare(b.code));
+    ge('accBody').innerHTML = accs.map(a => `
+        <tr>
+            <td class="bold" style="padding-left:${16 + (a.code.length - 4) * 14}px;"><span class="mono color-p mr-2">${a.code}</span>${a.code.length > 4 ? '<span style="color:#cbd5e1;margin-right:4px;">└─</span>' : ''}${esc(a.name)}</td>
+            <td class="tc color-m">${esc(a.direction)}</td><td class="tc"><span class="badge blue">${esc(a.type)}</span></td>
+            <td class="tc">${a.auxCategory ? `<span class="badge orange">${esc(a.auxCategory)}</span>` : '-'}</td>
+            <td class="tc">${a.isQty ? `<span class="badge cyan">${esc(a.unit)}</span>` : '-'}</td><td class="tc">${a.currency ? `<span class="badge purple">${esc(a.currency)}</span>` : '-'}</td>
+            <td class="tc"><button onclick="showAccDlg(null, '${a.code}')" class="btn btn-i text-xs mr-2" style="padding:4px 6px;">加下级</button><button onclick="showAccDlg(${a.id})" class="btn btn-n text-xs mr-2" style="padding:4px 6px;">修改</button><button onclick="delAcc(${a.id})" class="btn btn-text danger text-xs" style="padding:4px 6px;">删除</button></td>
+        </tr>`).join('');
+};
+
+window.showAccDlg = async function(id, parentCode) {
+    let a = id ? accs.find(x => x.id === id) : null;
+    let hasData = a ? await checkAccHasData(a.id) : false;
+    let pAcc = parentCode ? accs.find(x => x.code === parentCode) : null;
+
+    if (pAcc && await checkAccHasData(pAcc.id)) {
+        return alert(`【拦截】上级科目 [${pAcc.code} ${pAcc.name}] 已发生业务数据或存在期初余额！\n根据财务规范，不能再为其强行开设下级科目！`);
+    }
+
+    let defaultCode = '';
+    let defaultDir = '借';
+    let defaultType = '资产';
+    if (pAcc) {
+        let children = accs.filter(x => x.code.startsWith(pAcc.code) && x.code.length === pAcc.code.length + 2);
+        if (children.length > 0) {
+            let maxCode = Math.max(...children.map(x => parseInt(x.code.slice(-2))));
+            defaultCode = pAcc.code + String(maxCode + 1).padStart(2, '0');
+        } else {
+            defaultCode = pAcc.code + '01';
+        }
+        defaultDir = pAcc.direction;
+        defaultType = pAcc.type;
+    } else if (a) {
+        defaultCode = a.code;
+        defaultDir = a.direction;
+        defaultType = a.type;
+    }
+
+    let isLeaf = true;
+    if (a) isLeaf = !accs.some(x => x.code.startsWith(a.code) && x.code !== a.code);
+    else if (pAcc) isLeaf = true;
+
+    const auxCats = ['客户','供应商','项目部','员工','部门','商品','仓库','成本对象','其他'];
+    let mappedCats = (a && a.auxCategory) ? a.auxCategory.split(',') : [];
+
+    openDlg(a ? '修改科目' : (pAcc ? '新增下级科目' : '新增一级科目'), `
+        <div class="mb-3">
+            <label>编码 * (上级科目需已存在) ${hasData ? '<span class="color-d">(已有数据，编码受保护)</span>' : ''}</label>
+            <input id="fCode" class="inp" value="${defaultCode}" placeholder="如：100201" ${hasData || pAcc ? 'disabled' : ''}>
+        </div>
+        <div class="mb-3"><label>名称 *</label><input id="fName" class="inp" value="${a ? a.name : ''}" ${hasData ? 'disabled' : ''}></div>
+        ${hasData ? '<div class="alert alert-warn" style="margin-bottom:12px;padding:8px 12px;">⚠️ 强力拦截：该科目已发生凭证数据，名称、类别、方向、数量核算、外币核算以及关联辅助项目已全部安全锁定，不得修改。若要修改请先删除相关凭证。</div>' : ''}
+        <div class="grid-2 mb-3">
+            <div><label>方向 *</label><select id="fDir" class="sel" ${hasData || pAcc ? 'disabled' : ''}><option ${defaultDir === '借' ? 'selected' : ''}>借</option><option ${defaultDir === '贷' ? 'selected' : ''}>贷</option></select></div>
+            <div><label>类别 *</label><select id="fType" class="sel" ${hasData || pAcc ? 'disabled' : ''}>${['资产','负债','权益','成本','损益'].map(t => `<option ${defaultType === t ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+        </div>
+        <div class="grid-2 mb-3">
+            <div><label>存货数量核算</label><select id="fIsQty" class="sel" ${hasData ? 'disabled' : ''} onchange="ge('fUnit').disabled=this.value!=='1'"><option value="0" ${a && !a.isQty ? 'selected' : ''}>不启用</option><option value="1" ${a && a.isQty ? 'selected' : ''}>启用数量核算</option></select></div>
+            <div><label>计量单位</label><input id="fUnit" class="inp" value="${a ? a.unit || '' : ''}" ${a && a.isQty && !hasData ? '' : 'disabled'} placeholder="如：件, kg"></div>
+        </div>
+        <div class="mb-3">
+            <label>外币设置</label>
+            <select id="fCur" class="sel" ${hasData ? 'disabled' : ''}><option value="">[无外币]</option>${currencies.map(c => `<option value="${c.code}" ${a && a.currency === c.code ? 'selected' : ''}>${c.code} ${esc(c.name)}</option>`).join('')}</select>
+        </div>
+        <div class="mb-3">
+            <label>关联辅助核算类别 <span class="color-i">(严格控制：仅最末级科目可关联，支持多选)</span></label>
+            <div style="padding:10px; border:1px solid #cbd5e1; border-radius:6px; background:${!isLeaf || hasData ? '#f1f5f9' : '#fff'};">
+                ${!isLeaf ? '<div class="text-xs color-d" style="padding:10px 0;">非末级科目，系统禁止关联辅助核算类别。</div>' : auxCats.map(c => `
+                    <label style="display:inline-flex; align-items:center; margin-right:16px; margin-bottom:8px; cursor:${hasData ? 'not-allowed' : 'pointer'}; font-weight:normal;">
+                        <input type="checkbox" class="aux-cat-cb" value="${c}" ${mappedCats.includes(c) ? 'checked' : ''} ${hasData ? 'disabled' : ''}> <span style="margin-left:4px;">${c}</span>
+                    </label>
+                `).join('')}
+            </div>
+        </div>
+    `, async () => {
+        let code = ge('fCode').value.trim();
+        let name = ge('fName').value.trim();
+        if (!code || !name) return alert('请输入编码和名称');
+
+        let selCats = Array.from(document.querySelectorAll('.aux-cat-cb:checked')).map(cb => cb.value).join(',');
+
+        let d = {
+            code: code, 
+            name: name, 
+            direction: ge('fDir').value, 
+            type: ge('fType').value, 
+            currency: ge('fCur').value || '', 
+            isQty: ge('fIsQty').value === '1' ? 1 : 0, 
+            unit: ge('fUnit').value.trim(), 
+            auxCategory: selCats,
+            bookId: curBook.id, 
+            initBal: a ? a.initBal : 0, 
+            initFcBal: a ? a.initFcBal : 0, 
+            initQty: a ? a.initQty : 0
+        };
+        
+        if (d.isQty && !d.unit) return alert('开启数量核算必须填写计量单位！');
+        if (a) { d.id = a.id; await dbPut('subjects', d); } else await dbAdd('subjects', d);
+
+        if (pAcc && pAcc.auxCategory) {
+            pAcc.auxCategory = '';
+            await dbPut('subjects', pAcc);
+        }
+
+        closeDlg(); loadAccBody();
+    });
+};
+
+window.delAcc = async function(id) {
+    let a = accs.find(x => x.id === id); if (!a) return;
+    if (accs.some(x => x.code.startsWith(a.code) && x.code !== a.code)) return alert('该科目下存在明细子科目，请先删除子科目！');
+    if (await checkAccHasData(id)) return alert('【强制拦截】该会计科目已发生凭证业务数据，系统禁止删除！如必须删除，请先找出并删除关联了该科目的所有会计凭证。');
+    if (confirm('确认彻底删除该科目？')) { await dbDel('subjects', id); loadAccBody(); }
+};
+
+// -------------------------------------------------------------------------
+// 5. 自定义准则模板 (Standard Templates)
+// -------------------------------------------------------------------------
+window.pgStandard = async function() {
+    ge('pageEl').innerHTML = `<div class="card"><div class="flex-row mb-3"><button onclick="showStdDlg()" class="btn btn-p">➕ 自定义新准则模板</button><button onclick="ge('impStd').click()" class="btn btn-n">📥 导入 JSON 配置</button><input type="file" id="impStd" accept=".fdb,.json" class="hidden" onchange="hImpStd(this)"></div><div class="alert alert-info">准则配置仅作为创建新账套时的初始模板。对模板的修改不会影响任何已经创建的存量账套。</div><div class="table-wrap"><table class="tbl"><thead><tr><th class="tl">准则名称</th><th class="tc">预置科目数</th><th class="tc">预置报表数</th><th class="tc">操作</th></tr></thead><tbody id="stdBody"></tbody></table></div></div>`;
+    loadStdBody();
+};
+
+window.loadStdBody = async function() {
+    customStds = await dbAll('standards');
+    ge('stdBody').innerHTML = customStds.length ? customStds.map(s => `<tr><td class="bold color-p">${esc(s.name)}</td><td class="tc mono">${s.accounts?.length || 0} 个</td><td class="tc mono">${Object.keys(s.reports || {}).length} 个</td><td class="tc"><button onclick="showStdDlg(${s.id})" class="btn btn-n text-xs mr-2">编辑</button><button onclick="exStd(${s.id})" class="btn btn-i text-xs mr-2">导出</button><button onclick="dStd(${s.id})" class="btn btn-text danger text-xs">删除</button></td></tr>`).join('') : '<tr><td colspan="4" class="tc color-m py-4">目前仅存在系统内置的默认模板</td></tr>';
+};
+
+window.showStdDlg = function(id) {
+    let s = id ? customStds.find(x => x.id === id) : null;
+    openDlg(s ? '编辑准则模板' : '新增准则模板', `
+        <div class="mb-3"><label>名称 *</label><input id="fStdName" class="inp bold color-p" value="${s ? s.name : ''}"></div>
+        <div class="mb-3"><label>预置会计科目 (JSON格式)</label><textarea id="fStdAcc" class="inp mono" style="height:120px;font-size:11px;resize:vertical;">${s ? JSON.stringify(s.accounts || STD_ACCS, null, 2) : JSON.stringify(STD_ACCS, null, 2)}</textarea></div>
+        <div class="mb-3"><label>预置报表公式 (JSON格式)</label><textarea id="fStdRep" class="inp mono" style="height:120px;font-size:11px;resize:vertical;">${s ? JSON.stringify(s.reports || DEFAULT_REPORTS, null, 2) : JSON.stringify(DEFAULT_REPORTS, null, 2)}</textarea></div>
+    `, async () => {
+        let name = ge('fStdName').value.trim(); if (!name) return alert('填写名称');
+        try {
+            let ac = JSON.parse(ge('fStdAcc').value), rp = JSON.parse(ge('fStdRep').value);
+            let d = {name, accounts: ac, reports: rp, sysAccs: s ? s.sysAccs : DEFAULT_SYS_ACCS};
+            if (s) { d.id = s.id; await dbPut('standards', d); } else await dbAdd('standards', d);
+            closeDlg(); loadStdBody();
+        } catch (e) { alert('JSON 解析失败，请检查语法: ' + e.message); }
+    });
+};
+
+window.hImpStd = function(i) {
+    let f = i.files[0]; if (!f) return; let r = new FileReader();
+    r.onload = async e => {
+        try { let o = JSON.parse(e.target.result); if (!o.name || !o.accounts) throw new Error('配置缺少必要字段'); await dbAdd('standards', o); alert('导入成功！'); loadStdBody(); } 
+        catch (err) { alert('导入失败: ' + err.message); } i.value = '';
+    }; r.readAsText(f, 'UTF-8');
+};
+
+window.exStd = async function(id) {
+    let s = customStds.find(x => x.id === id); if (!s) return;
+    let b = new Blob([JSON.stringify(s, null, 2)], {type: 'application/json'}), u = URL.createObjectURL(b);
+    let a = document.createElement('a'); a.href = u; a.download = '准则模板_' + s.name + '.json'; a.click(); URL.revokeObjectURL(u);
+};
+window.dStd = async function(id) { if (confirm('确认删除该准则模板？')) { await dbDel('standards', id); loadStdBody(); } };
+
+// -------------------------------------------------------------------------
+// 6. 期末结账引擎 (Closing Period) 与 损益结转
+// -------------------------------------------------------------------------
+
+window.editProfitTransferRules = function() {
+    let sy = curBook.sysAccs || DEFAULT_SYS_ACCS;
+    let html = `
+    <div class="mb-3">
+        <label>本年利润科目编码 *</label>
+        <input id="cfgProfit" class="inp" value="${sy.profit || '3103'}" placeholder="例如：3103">
+    </div>
+    <div class="mb-3">
+        <label>收入类科目编码前缀 (英文逗号分隔)</label>
+        <input id="cfgInc" class="inp" value="${sy.incPrefix || '50,51,53'}" placeholder="例如：50,51,53">
+    </div>
+    <div class="mb-3">
+        <label>费用类科目编码前缀 (英文逗号分隔)</label>
+        <input id="cfgExp" class="inp" value="${sy.expPrefix || '54,56,57,58'}" placeholder="例如：54,56,57,58">
+    </div>
+    <div class="alert alert-info"><b>提示：</b>系统将根据上述前缀，自动提取损益类科目的期末余额进行反向结平，并将净差额一键结转至【本年利润】科目。</div>
+    `;
+    window.openDlg('⚙️ 配置期末结转规则', html, async () => {
+        let p = window.ge('cfgProfit').value.trim();
+        let i = window.ge('cfgInc').value.trim();
+        let e = window.ge('cfgExp').value.trim();
+        if(!p) return alert('本年利润科目编码不能为空');
+        
+        curBook.sysAccs = curBook.sysAccs || {};
+        curBook.sysAccs.profit = p;
+        curBook.sysAccs.incPrefix = i;
+        curBook.sysAccs.expPrefix = e;
+        curBook.sysAccs.profitPrefix = Array.from(new Set([...i.split(','), ...e.split(',')])).filter(x=>x).join(',');
+        
+        await window.dbPut('books', curBook);
+        window.closeDlg();
+        alert('结转规则配置保存成功！');
+    });
+};
+
+window.pgClosing = async function() {
+    let cs = await window.dbIdx('closings', 'bookId', curBook.id);
+    let isC = cs.some(c => c.period === curPeriod);
+    
+    // 关键修复：探测上一个会计期间是否存在结账记录，用于解锁“反结账”按钮
+    let prevPeriod = window.prevP(curPeriod);
+    let hasPrevClosed = cs.some(c => c.period === prevPeriod);
+
+    ge('pageEl').innerHTML = `
+    <div class="card">
+        <div class="ctitle">期末处理与结账引擎</div>
+        ${isC ? '<div class="alert alert-warn"><b>🔒 已结账：当前期间数据已被冻结！</b>如需修改凭证请先执行下方的反结账。</div>' : '<div class="alert alert-info"><b>🟢 正常开放中：</b>可进行日常凭证处理与期末自动结转。</div>'}
+        <div class="grid-2 mb-4">
+            <div class="scard">
+                <div class="bold mb-2"><span class="color-i">[1]</span> 期末调汇</div>
+                <div class="text-xs color-m mb-3">自动提取外币科目余额计算汇兑差额，并生成凭证</div>
+                <button onclick="calcExcAdj()" class="btn btn-i" ${isC ? 'disabled' : ''}>执行期末调汇</button>
+            </div>
+            <div class="scard">
+                <div class="flex-between mb-2">
+                    <div class="bold"><span class="color-w">[2]</span> 结转利润</div>
+                    <button onclick="editProfitTransferRules()" class="btn btn-n text-xs" style="padding:2px 8px;">⚙️ 配置规则</button>
+                </div>
+                <div class="text-xs color-m mb-3">将损益类科目的余额清零，净额结转至本年利润</div>
+                <button onclick="calcProfitTransfer()" class="btn btn-w w-full" ${isC ? 'disabled' : ''}>执行损益结转</button>
+            </div>
+        </div>
+        <div class="scard mb-4" style="background:var(--danger-light);border-color:#fecaca;">
+            <div class="bold mb-2 color-d">[3] 确认期末结账</div>
+            <div class="text-xs color-m mb-3">冻结本期所有数据，系统将自动推移并进入下个财务期间。</div>
+            <button onclick="doClosing()" class="btn btn-d w-full" style="padding:10px;font-size:14px;" ${isC ? 'disabled' : ''}>🔒 结账并进入下一期</button>
+        </div>
+        <div class="scard">
+            <div class="bold mb-2">反结账 (回退功能)</div>
+            <div class="text-xs color-m mb-3">撤销上一个账期 (${prevPeriod}) 的结账锁定状态，退回至上期允许补充修改。</div>
+            <button onclick="undoClosing()" class="btn btn-n" ${!hasPrevClosed ? 'disabled' : ''}>🔓 撤销结账 (退回至 ${prevPeriod})</button>
+        </div>
+    </div>`;
+};
+
+window.calcExcAdj = async function() {
+    let ca = accs.filter(a => a.currency && isLeafAcc(a.code));
+    if (!ca.length) return alert('当前账套暂无挂接外币的科目，无需调汇。');
+    let bm = await calcTAcc(curPeriod, false, null, '已审核'), es = [];
+    
+    for (let a of ca) {
+        let c = currencies.find(x => x.code === a.currency); if (!c) continue;
+        let m = bm[a.id], nb = m.fcBal * c.rate, df = nb - m.bal;
+        if (Math.abs(df) >= 0.01) {
+            let adA = accs.find(x => x.code === '560301'); if (!adA) continue;
+            if (df > 0) {
+                es.push({accId: a.id, summary: '期末自动调汇', deb: df, cre: 0});
+                es.push({accId: adA.id, summary: '期末调汇结转', deb: 0, cre: df});
+            } else {
+                es.push({accId: adA.id, summary: '期末调汇结转', deb: Math.abs(df), cre: 0});
+                es.push({accId: a.id, summary: '期末自动调汇', deb: 0, cre: Math.abs(df)});
+            }
+        }
+    }
+    if (es.length) { await injectVoucher('转', '期末自动调汇转账凭证', es); alert('调汇完毕，已成功生成转账凭证！'); } 
+    else alert('无汇兑差额，无需调汇。');
+};
+
+// 经过彻底修正与重构的损益结转核心算法
+window.calcProfitTransfer = async function() {
+    let sy = curBook.sysAccs || DEFAULT_SYS_ACCS;
+    let pa = accs.find(a => a.code === sy.profit);
+    if (!pa) return alert('配置错误：未找到指定的“本年利润”归集科目！请点击右上角[配置规则]进行设置。');
+
+    let incP = (sy.incPrefix || '').split(',').filter(x=>x);
+    let expP = (sy.expPrefix || '').split(',').filter(x=>x);
+    
+    // 获取本期末 T型账，提取结转前的期末真实余额
+    let oc = await calcTAcc(curPeriod, true, curPeriod, '已审核');
+    let es = [], totalProfitTransfer = 0; 
+
+    for (let k in oc) {
+        let o = oc[k];
+        let isInc = incP.some(x => o.code.startsWith(x));
+        let isExp = expP.some(x => o.code.startsWith(x));
+        let isOtherPL = sy.profitPrefix && sy.profitPrefix.split(',').filter(x=>x).some(x => o.code.startsWith(x) && o.code !== sy.profit);
+
+        if (isInc || isExp || isOtherPL) {
+            // 计算期间内净借方余额（借方 - 贷方）
+            let netDebit = o.deb - o.cre;
+            if (Math.abs(netDebit) >= 0.01) {
+                if (netDebit > 0) {
+                    // 若余额在借方（如费用类），必须在贷方记账予以平账结转
+                    es.push({accId: o.id, summary: '结转本期损益', deb: 0, cre: netDebit});
+                    totalProfitTransfer -= netDebit; // 费用增加，导致本年利润减少
+                } else {
+                    // 若余额在贷方（如收入类），必须在借方记账予以平账结转
+                    let netCredit = Math.abs(netDebit);
+                    es.push({accId: o.id, summary: '结转本期损益', deb: netCredit, cre: 0});
+                    totalProfitTransfer += netCredit; // 收入增加，导致本年利润增加
+                }
+            }
+        }
+    }
+
+    if (es.length === 0) return alert('系统检测到本期损益类科目均无未结转的余额，无需操作。');
+
+    // 差额转入本年利润
+    if (totalProfitTransfer > 0) {
+        // 净利润：贷记本年利润
+        es.push({accId: pa.id, summary: '结转本期净利润', deb: 0, cre: totalProfitTransfer});
+    } else if (totalProfitTransfer < 0) {
+        // 净亏损：借记本年利润
+        es.push({accId: pa.id, summary: '结转本期净亏损', deb: Math.abs(totalProfitTransfer), cre: 0});
+    }
+
+    // 将生成的明细注入新凭证
+    await injectVoucher('转', '结转本期损益', es);
+    alert('🎉 利润结转完成，已成功生成转账凭证！\n所有损益类科目的期末余额已自动清零并结转至本年利润。');
+};
+
+window.injectVoucher = async function(w, s, es) {
+    let av = await dbIdx('vouchers', 'bookId', curBook.id);
+    let vn = w + '-' + String(av.filter(x => x.period === curPeriod).length + 1).padStart(4, '0');
+    let td = es.reduce((sum, e) => sum + e.deb, 0), tc = es.reduce((sum, e) => sum + e.cre, 0);
+    let lDay = new Date(new Date(curPeriod + '-01').getFullYear(), new Date(curPeriod + '-01').getMonth() + 1, 0).getDate();
+    let vid = await dbAdd('vouchers', {bookId: curBook.id, period: curPeriod, vno: vn, date: `${curPeriod}-${String(lDay).padStart(2,'0')}`, status: '未审核', summary: s, totalDeb: td, totalCre: tc, attach: 0});
+    for (let e of es) await dbAdd('entries', {bookId: curBook.id, voucherId: vid, ...e});
+};
+
+window.doClosing = async function() {
+    let uns = (await dbIdx('vouchers', 'bookId', curBook.id)).filter(v => v.period === curPeriod && v.status === '未审核');
+    if (uns.length > 0) return alert(`本期尚有 ${uns.length} 张未审核的凭证，结账拦截！`);
+
+    if (!confirm('⚠️ 结账操作会将当前期间的所有数据彻底冻结。确定执行结账吗？')) return;
+    
+    await dbAdd('closings', {bookId: curBook.id, period: curPeriod});
+    curBook.currentPeriod = nextP(curPeriod);
+    await dbPut('books', curBook);
+    
+    curPeriod = curBook.currentPeriod; isClosed = false;
+    alert('结账成功！系统已进入新财务期间：' + curPeriod);
+    ge('sbPeriod').textContent = curPeriod; ge('sbStatus').textContent = '已结账'; ge('sbStatus').className = 'badge red';
+    pgClosing();
+};
+
+window.undoClosing = async function() {
+    let targetP = window.prevP(curPeriod);
+    if (!confirm(`⚠️ 确定要退回上一个会计期间 (${targetP}) 吗？\n这将解除上期的冻结状态，允许您重新修改凭证。`)) return;
+    
+    let cs = await window.dbIdx('closings', 'bookId', curBook.id);
+    let c = cs.find(x => x.period === targetP);
+    
+    if (c) {
+        await window.dbDel('closings', c.id);
+        curBook.currentPeriod = targetP; 
+        await window.dbPut('books', curBook);
+        
+        curPeriod = targetP; 
+        isClosed = false;
+        alert('🎉 反结账成功！系统已退回至账期：' + targetP);
+        
+        // 同步更新侧边栏UI状态
+        if(ge('sbPeriod')) ge('sbPeriod').textContent = curPeriod; 
+        if(ge('sbStatus')) { ge('sbStatus').textContent = '开放中'; ge('sbStatus').className = 'badge green'; }
+        
+        pgClosing(); // 重新渲染结账面板
+    } else {
+        alert('未找到上期的结账记录，无法进行反结账操作。');
+    }
+};
+
+// -------------------------------------------------------------------------
+// 7. 自动容灾存储引擎 (Storage Sync)
+// -------------------------------------------------------------------------
+window.pgStorage = async function() {
+    ge('pageEl').innerHTML = `
+    <div class="card">
+        <div class="ctitle">自动容灾备份引擎 (原生 FileSystem API 直连)</div>
+        <div class="alert alert-info">开启后，系统将在您进行核心操作（保存凭证等）时，静默向您本地授权的文件夹中写入实时的 <code>.fdb</code> 加密快照文件。彻底解决浏览器缓存丢失风险！</div>
+        <div class="grid-2">
+            <div class="scard">
+                <div class="bold mb-3 color-p">物理同步目录链路</div>
+                <div id="syncStatusUI" class="mb-4"></div>
+                <div class="flex-row"><button onclick="if(window.bindSyncDir)window.bindSyncDir()" class="btn btn-p">授权绑定文件夹</button><button onclick="if(window.unbindSyncDir)window.unbindSyncDir()" class="btn btn-n text-xs">切断连接</button></div>
+            </div>
+            <div class="scard">
+                <div class="bold mb-3 color-p">快照加密设置</div>
+                <div class="mb-4"><label>设置备份文件加密密码 (选填)</label><input type="password" id="syncPwdInp" class="inp" placeholder="留空则生成明文快照"></div>
+                <button onclick="if(window.saveSyncConfig)window.saveSyncConfig()" class="btn btn-n">保存加密策略</button>
+                <div class="text-xs color-m mt-3 border-t pt-2">自动生成的快照清单：<br><span id="syncFileList" class="mono" style="line-height:2;color:var(--text-main);"></span></div>
+            </div>
+        </div>
+    </div>`;
+    
+    if (typeof window.updateStoragePageSyncUI === 'function') window.updateStoragePageSyncUI();
+    
+    let fs = ['FinanceOS_全局备份.fdb'];
+    if (curBook) fs.push('FinanceOS_账套备份_' + curBook.name.replace(/[\\/:*?"<>|]/g, '_') + '.fdb');
+    ge('syncFileList').innerHTML = fs.join('<br>');
+};
+
+// -------------------------------------------------------------------------
+// 8. 手动数据备份与还原中心 (Backup & Restore)
+// -------------------------------------------------------------------------
+
+// --- GB/T 24589-2024 XML 国标构建核心 ---
+window.buildGBXML = function(data, isFull) {
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<AccountingSoftwareDataExchange xmlns="http://www.gbt24589.cn/">\n`;
+    let books = isFull ? data.books : data.books;
+    if(!books) books = [];
+    
+    for(let b of books) {
+        xml += `  <ElectronicAccountingBook>\n`;
+        xml += `    <BookInfo>\n      <BookName>${esc(b.name)}</BookName>\n      <Period>${esc(b.currentPeriod)}</Period>\n    </BookInfo>\n`;
+        xml += `    <AccountingSubjects>\n`;
+        let acs = data.subjects ? data.subjects.filter(s => s.bookId === b.id) : [];
+        for(let a of acs) {
+            xml += `      <Subject>\n        <Code>${esc(a.code)}</Code>\n        <Name>${esc(a.name)}</Name>\n        <Direction>${esc(a.direction)}</Direction>\n        <Type>${esc(a.type)}</Type>\n      </Subject>\n`;
+        }
+        xml += `    </AccountingSubjects>\n`;
+        xml += `    <Vouchers>\n`;
+        let vs = data.vouchers ? data.vouchers.filter(v => v.bookId === b.id) : [];
+        let es = data.entries ? data.entries.filter(e => e.bookId === b.id) : [];
+        for(let v of vs) {
+            xml += `      <Voucher>\n        <VoucherNo>${esc(v.vno)}</VoucherNo>\n        <Date>${esc(v.date)}</Date>\n        <Period>${esc(v.period)}</Period>\n        <Entries>\n`;
+            let ves = es.filter(e => e.voucherId === v.id);
+            for(let e of ves) {
+                xml += `          <Entry>\n            <Summary>${esc(e.summary)}</Summary>\n            <SubjectCode>${esc(acs.find(a=>a.id===e.accId)?.code||'')}</SubjectCode>\n            <Debit>${e.deb||0}</Debit>\n            <Credit>${e.cre||0}</Credit>\n          </Entry>\n`;
+            }
+            xml += `        </Entries>\n      </Voucher>\n`;
+        }
+        xml += `    </Vouchers>\n`;
+        xml += `  </ElectronicAccountingBook>\n`;
+    }
+    xml += `</AccountingSoftwareDataExchange>`;
+    return xml;
+};
+
+window.exportFullGBXML = async function() {
+    let d = await getFullDataJSON();
+    let xml = buildGBXML(d, true);
+    let b = new Blob(['\uFEFF' + xml], {type: 'text/xml;charset=utf-8'});
+    let u = URL.createObjectURL(b); let a = document.createElement('a');
+    a.href = u; a.download = 'GB_T24589_系统全库标准XML导出_' + new Date().toISOString().slice(0,10) + '.xml'; a.click(); URL.revokeObjectURL(u);
+};
+
+window.exportSingleGBXML = async function() {
+    if (!curBook) return alert('必须先进入具体的账套。');
+    let d = await getSingleBookDataJSON(curBook.id);
+    let xml = buildGBXML(d, false);
+    let b = new Blob(['\uFEFF' + xml], {type: 'text/xml;charset=utf-8'});
+    let u = URL.createObjectURL(b); let a = document.createElement('a');
+    a.href = u; a.download = 'GB_T24589_单账套标准XML导出_' + curBook.name + '_' + new Date().toISOString().slice(0,10) + '.xml'; a.click(); URL.revokeObjectURL(u);
+};
+
+
+window.pgBackup = async function() {
+    ge('pageEl').innerHTML = `
+    <div class="card">
+        <div class="ctitle">手动数据备份与还原中心</div>
+        <div class="alert alert-warn">支持将数据打包导出为离线的 .fdb 存档快照。<b>⚠️警告：执行还原操作将直接覆盖抹除浏览器中现有的账套数据！</b></div>
+        <div class="grid-2">
+            <div class="scard">
+                <div class="bold mb-3 color-p">📥 导出离线快照 (.fdb)</div>
+                <div class="text-xs color-m mb-4">将底层数据库提纯打包保存到本地电脑。</div>
+                <div class="flex-row">
+                    <button onclick="exportFullBackup()" class="btn btn-p">导出所有账套全库</button>
+                    <button onclick="exportSingleBackup()" class="btn btn-i text-xs">仅打包当前账套</button>
+                </div>
+            </div>
+            <div class="scard" style="border:1px dashed var(--danger);">
+                <div class="bold mb-3 color-d">📤 强制覆盖还原 (.fdb)</div>
+                <div class="text-xs color-m mb-4">上传 .fdb 存档，系统将原封不动地重新注入该时空的数据。</div>
+                <div class="flex-row">
+                    <button onclick="ge('impB').click()" class="btn btn-d">选择文件进行还原重置</button>
+                    <input type="file" id="impB" accept=".fdb" class="hidden" onchange="hImpB(this)">
+                </div>
+            </div>
+            
+            <div class="scard mt-2" style="grid-column: span 2; background: #eff6ff; border: 1px solid #93c5fd;">
+                <div class="bold mb-3 color-i">📥 国家标准 XML 导出 (GB/T 24589-2024)</div>
+                <div class="text-xs color-m mb-4">按照现行最新《财经信息技术 会计核算软件数据接口》标准输出审计与备案格式的统一 XML 文件。</div>
+                <div class="flex-row">
+                    <button onclick="exportFullGBXML()" class="btn btn-p">导出全部账套国标 XML</button>
+                    <button onclick="exportSingleGBXML()" class="btn btn-n text-xs">仅导出当前账套国标 XML</button>
+                </div>
+            </div>
+        </div>
+    </div>`;
+};
+
+window.exportFullBackup = async function() {
+    let d = await getFullDataJSON(), p = prompt('设置全局备份密码 (留空则不加密直接确认):');
+    let c = buildFdbContent(d, p || ''), b = new Blob([c], {type: 'application/octet-stream'}), u = URL.createObjectURL(b), a = document.createElement('a');
+    a.href = u; a.download = 'FOS_系统全库快照_' + new Date().toISOString().slice(0,10) + '.fdb'; a.click(); URL.revokeObjectURL(u);
+};
+
+window.exportSingleBackup = async function() {
+    if (!curBook) return alert('必须先进入具体的账套。');
+    let d = await getSingleBookDataJSON(curBook.id), p = prompt('设置当前账套备份密码 (留空不加密):');
+    let c = buildFdbContent(d, p || ''), b = new Blob([c], {type: 'application/octet-stream'}), u = URL.createObjectURL(b), a = document.createElement('a');
+    a.href = u; a.download = 'FOS_单账套快照_' + curBook.name + '_' + new Date().toISOString().slice(0,10) + '.fdb'; a.click(); URL.revokeObjectURL(u);
+};
+
+window.hImpB = function(i) {
+    let f = i.files[0]; if (!f) return;
+    if (!confirm('⚠️ 极端高危警告：执行导入操作将会彻底覆盖系统现有的所有相关数据！请确认您是否要继续？')) { i.value = ''; return; }
+    
+    let r = new FileReader();
+    r.onload = async e => {
+        try {
+            let p = prompt('请输入该存档文件的通行密码 (若未加密请直接确认留空):');
+            if (p === null) return;
+            
+            let d = parseFdbContent(e.target.result, p || '');
+            
+            if (d.backupType === 'full') {
+                for (let s of ['books', 'subjects', 'vouchers', 'entries', 'closings', 'auxItems', 'standards', 'currencies']) {
+                    if (d[s]) { await dbOp('clear', s); for (let it of d[s]) await dbAdd(s, it); }
+                }
+            } else if (d.backupType === 'single') {
+                if (!d.books || !d.books[0]) throw new Error('单账套快照结构损毁');
+                let bk = d.books[0], eb = await dbAll('books'), ex = eb.find(b => b.name === bk.name);
+                
+                if (ex) {
+                    if (!confirm(`系统中已存在同名账套【${bk.name}】，是否将其全部数据强行重置覆盖？`)) { i.value = ''; return; }
+                    bk.id = ex.id;
+                } else delete bk.id;
+                
+                bk.id = await dbPut('books', bk);
+                for (let s of ['subjects', 'vouchers', 'entries', 'closings', 'auxItems', 'currencies']) {
+                    if (d[s]) {
+                        let eI = await dbIdx(s, 'bookId', bk.id);
+                        for (let x of eI) await dbDel(s, x.id);
+                        for (let it of d[s]) { it.bookId = bk.id; delete it.id; await dbAdd(s, it); }
+                    }
+                }
+            }
+            alert('🎉 数据重塑完成！引擎已重置，即将退回大厅。');
+            if (typeof window.exitBook === 'function') window.exitBook(); else window.location.reload();
+        } catch (err) { alert('还原失败，密码不匹配或快照已损坏：' + err.message); }
+        i.value = '';
+    };
+    r.readAsText(f, 'UTF-8');
+};
+</script>
